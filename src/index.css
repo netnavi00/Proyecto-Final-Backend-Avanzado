@@ -1,0 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-aura-bg: #050505;
+  --color-aura-green: #00ff41;
+  --color-aura-cyan: #00e5ff;
+  --color-aura-red: #ff003c;
+  --color-aura-dark: #1a1a1a;
+  --color-aura-panel: #0a0a0a;
+  --color-aura-inner: #111111;
+  --color-aura-text: #ffffff;
+  --color-aura-black: #000000;
+  
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+body {
+  background-color: var(--color-aura-bg);
+  color: var(--color-aura-green);
+  font-family: var(--font-mono);
+}
+
+/* Custom Utilities for Glow Effects */
+@utility glow-green {
+  box-shadow: 0 0 5px rgba(0, 255, 65, 1);
+}
+@utility glow-red {
+  box-shadow: 0 0 5px rgba(255, 0, 60, 1);
+}
+@utility glow-cyan {
+  box-shadow: 0 0 5px rgba(0, 229, 255, 1);
+}
+
+@utility text-glow-green {
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.6);
+}
+@utility text-glow-red {
+  text-shadow: 0 0 8px rgba(255, 0, 60, 0.6);
+}
+@utility text-glow-cyan {
+  text-shadow: 0 0 8px rgba(0, 229, 255, 0.6);
+}
+
+/* Scrollbar Customization */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-aura-bg);
+  border-left: 1px solid var(--color-aura-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-aura-green);
+  opacity: 0.5;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-aura-cyan);
+}
+
+.scada-grid {
+  background-image: radial-gradient(var(--color-aura-inner) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.sandbox-grid {
+  background-image: linear-gradient(rgba(0, 229, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 229, 255, 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
