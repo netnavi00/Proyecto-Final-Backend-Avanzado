@@ -11,8 +11,6 @@ let sandbox = fs.readFileSync('src/components/SandboxModule.tsx', 'utf-8');
   if (index === 1) sandbox = content;
 });
 
-// For any inputs that we want to keep thin we could revert. But inputs were already using border-2 now since border border-aura-dark became border-2 border-aura-dark. It's fine, thicker inputs fit the industrial style.
-
 fs.writeFileSync('src/App.tsx', app);
 fs.writeFileSync('src/components/SandboxModule.tsx', sandbox);
 
