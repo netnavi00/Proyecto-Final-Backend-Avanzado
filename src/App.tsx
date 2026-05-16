@@ -48,25 +48,36 @@ const CATEGORIES = ['PIZZA/PASTAS/ITALIANA', 'BAR', 'MEXICANA', 'ASIATICA', 'POS
 /* --- COMPONENTE FUNCIONAL: AURA CENTRAL --- */
 function AuraCentral() {
   const [profiles, setProfiles] = useState<any[]>([]);
-  const [establishments, setEstablishments] = useState<any[]>([]);
+  const [establishment, setEstablishment] = useState<any[]>([]);
+  const [devices, setDevices] = useState<any[]>([]); // Sincronizado para ver el inventario
   const [loading, setLoading] = useState(false);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ id: '', full_name: '', role: 'admin', establishment_name: '' , establishment_tier: 'BASIC', establishment_category: '' });
+  const [deviceData, setDeviceData] = useState({id: '', establishment_id: ''});
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const { data: profs } = await supabase.from('profiles').select('*').order('role', { ascending: false });
-      const { data: ests } = await supabase.from('establishments').select('*, owner:profiles(full_name)');
-      if (profs) setProfiles(profs);
-      if (ests) setEstablishments(ests);
-    } catch (e) {
-      console.error("Central Load Error:", e);
-    } finally {
-      setLoading(false);
-    }
-  };
+ const loadData = async () => {
+  setLoading(true);
+  try {
+    const { data: profs, error: pErr } = await supabase.from('profiles').select('*').order('role', { ascending: false });
+    
+    // Consultas planas para evitar el GET 400 Bad Request
+    const { data: ests, error: eErr } = await supabase.from('establishments').select('*');
+    const { data: devs, error: dErr } = await supabase.from('devices').select('*'); 
+    
+    if (pErr) console.error("Error perfiles:", pErr.message);
+    if (eErr) console.error("Error locales:", eErr.message);
+    if (dErr) console.error("Error hardware:", dErr.message);
+
+    setProfiles(profs || []);
+    setEstablishment(ests || []);
+    setDevices(devs || []);
+  } catch (e) {
+    console.error("Central Load Error:", e);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => { loadData(); }, []);
 
@@ -74,7 +85,6 @@ function AuraCentral() {
     e.preventDefault();
     setLoading(true);
     
-    // 1. Autorizar el rango del usuario
     const { error: profileError } = await supabase.rpc('admin_upsert_profile', {
       target_id: formData.id, 
       new_name: formData.full_name.toUpperCase(), 
@@ -82,7 +92,6 @@ function AuraCentral() {
     });
 
     if (!profileError) {
-      // 2. Si se escribió un establecimiento, lo creamos y lo linkeamos al instante
       if (formData.establishment_name.trim() !== '') {
         const { error: estError } = await supabase.rpc('admin_create_establishment', {
           p_name: formData.establishment_name.toUpperCase(),
@@ -112,8 +121,24 @@ function AuraCentral() {
     else console.error("Error updating role:", error.message);
   };
 
+  const handleProvisionDevice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const { error } = await supabase.rpc('admin_provision_device', {
+      p_id: deviceData.id,
+      p_establishment_id: deviceData.establishment_id
+    });
+
+    if (error) alert("Error: " + error.message);
+    else {
+      setDeviceData({ id: '', establishment_id: '' });
+      await loadData();
+    }
+    setLoading(false);
+  };
+
   return (
-    <div className="space-y-10">
+    <div className="space-y-10 pb-20">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <ShieldAlert size={32} className="text-[#a855f7] drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]" />
@@ -188,23 +213,91 @@ function AuraCentral() {
               <tr className="border-b border-aura-dark bg-aura-dark/30">
                 <th className="p-4 text-[10px] uppercase opacity-40 font-black">Node Name</th>
                 <th className="p-4 text-[10px] uppercase opacity-40 font-black">Tier</th>
+                <th className="p-4 text-[10px] uppercase opacity-40 font-black">Category</th>
                 <th className="p-4 text-[10px] uppercase opacity-40 font-black">Owner Handle</th>
               </tr>
             </thead>
             <tbody>
-              {establishments.map((e) => (
-                <tr key={e.id} className="border-b border-aura-dark/30 hover:bg-aura-dark/20 transition-colors">
-                  <td className="p-4 text-aura-text font-bold uppercase tracking-widest">{e.name}</td>
-                  <td className="p-4">
-                    <span className="px-2 py-1 border border-aura-cyan/50 text-aura-cyan text-[10px] font-bold uppercase">
-                      {e.tier || 'BASIC'}
-                    </span>
-                  </td>
-                  <td className="p-4 text-aura-green font-bold uppercase">
-                    {e.owner?.full_name || 'System_Root'}
+              {establishment.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="p-8 text-center opacity-20 italic">
+                    NO_NODES_DETECTED_IN_GRID
                   </td>
                 </tr>
+              ) : (
+                establishment.map((e) => (
+                  <tr key={e.id} className="border-b border-aura-dark/30 hover:bg-aura-dark/20 transition-colors">
+                    <td className="p-4 text-aura-text font-bold uppercase tracking-widest">{e.name}</td>
+                    <td className="p-4">
+                      <span className="px-2 py-1 border border-aura-cyan/50 text-aura-cyan text-[10px] font-bold uppercase">{e.tier}</span>
+                    </td>
+                    <td className="p-4 text-aura-text/70 uppercase">{e.category_id || 'N/A'}</td>
+                    <td className="p-4 text-aura-green font-bold uppercase">{e.owner?.full_name || 'System_Root'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* --- NUEVA SECCIÓN: HARDWARE INVENTORY & PROVISIONING --- */}
+      <div className="space-y-4 pt-4">
+        <SectionTitle>Hardware Inventory & Provisioning</SectionTitle>
+        <form onSubmit={handleProvisionDevice} className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-aura-cyan/5 p-6 border border-aura-cyan/20 font-mono">
+          <div>
+            <label className="text-[10px] uppercase opacity-40 block mb-1 font-bold text-aura-cyan">RPi_Hardware_UUID</label>
+            <input 
+              required value={deviceData.id}
+              onChange={e => setDeviceData({...deviceData, id: e.target.value})}
+              placeholder="00000000-0000-0000..."
+              className="w-full bg-aura-inner border border-aura-dark p-3 text-aura-cyan font-mono text-xs outline-none focus:border-aura-cyan"
+            />
+          </div>
+          <div>
+           <label className="text-[10px] uppercase opacity-40 block mb-1 font-bold text-aura-cyan">Assign_To_Establishment</label>
+            <select 
+              required 
+              value={deviceData.establishment_id || ''}
+              onChange={e => setDeviceData({...deviceData, establishment_id: e.target.value})}
+              className="w-full bg-aura-inner border border-aura-cyan/30 p-3 text-aura-cyan outline-none focus:border-aura-cyan uppercase text-xs"
+            >
+              <option value="">Select_Establishment</option>
+              {establishment?.map(e => (
+                <option key={e.id} value={e.id}>{e.name}</option>
               ))}
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button type="submit" disabled={loading} className="w-full bg-aura-cyan text-black font-black p-3 uppercase hover:brightness-110 transition-all active:scale-95 disabled:opacity-50">
+              Provision_Unit
+            </button>
+          </div>
+        </form>
+
+        <div className="border border-aura-dark bg-aura-black/40 overflow-hidden font-mono text-[13px]">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-white/5 text-[10px] uppercase text-aura-cyan font-black tracking-widest">
+              <tr className="border-b border-aura-dark bg-aura-dark/30">
+                <th className="p-4 text-[10px] uppercase font-black">Device UUID</th>
+                <th className="p-4 text-[10px] uppercase font-black">Node Assigned</th>
+                <th className="p-4 text-[10px] uppercase font-black text-right">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+                {devices.length === 0 ? (
+                  <tr key="no-devices"><td colSpan={3} className="p-10 text-center opacity-20 italic">No hardware provisioned yet.</td></tr>
+                ) : (
+                  devices.map((d, i) => (
+                    <tr key={d.id || i} className="border-t border-aura-dark/20 opacity-70">
+                    <td className="p-4 font-mono opacity-60">{d.id}</td>
+                    <td className="p-4 uppercase text-aura-text font-bold">{d.establishment_id ? `NODO [${d.establishment_id.substring(0,8)}]` : 'Unassigned'}</td>
+                    <td className="p-4 text-right">
+                      <span className="text-aura-green font-bold">[{d.status || 'provisioned'}]</span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -234,33 +327,32 @@ function AuraCentral() {
                     <label className="text-[10px] uppercase opacity-40 block mb-1 text-aura-cyan font-bold">Link Establishment (Node Name)</label>
                     <input required={formData.role === 'admin'} value={formData.establishment_name} onChange={e => setFormData({...formData, establishment_name: e.target.value})} placeholder="EJ: ARCADE CHOLULA" className="w-full bg-aura-inner border border-aura-cyan/30 p-3 text-aura-cyan outline-none focus:border-aura-cyan uppercase" />
                     <div className="grid grid-cols-2 gap-4 mt-4">
-  <div>
-    <label className="text-[10px] uppercase opacity-40 block mb-1 text-aura-cyan font-bold">Tier</label>
-    <select 
-      value={formData.establishment_tier} 
-      onChange={e => setFormData({...formData, establishment_tier: e.target.value})}
-      className="w-full bg-aura-inner border border-aura-cyan/30 p-3 text-aura-cyan outline-none focus:border-aura-cyan uppercase"
-    >
-      <option value="BASIC">BASIC</option>
-      <option value="PRO">PRO</option>
-      <option value="PREMIUM">PREMIUM</option>
-    </select>
-  </div>
-  <div>
-    <label className="text-[10px] uppercase opacity-40 block mb-1 text-aura-cyan font-bold">Category</label>
-    <select 
-      value={formData.establishment_category} 
-      onChange={e => setFormData({...formData, establishment_category: e.target.value})}
-      className="w-full bg-aura-inner border border-aura-cyan/30 p-3 text-aura-cyan outline-none focus:border-aura-cyan uppercase"
-    >
-      {CATEGORIES.map(cat => (
-        <option key={cat} value={cat}>{cat}</option>
-      ))}
-    </select>
-  </div>
-</div>
+                      <div>
+                        <label className="text-[10px] uppercase opacity-40 block mb-1 text-aura-cyan font-bold">Tier</label>
+                        <select 
+                          value={formData.establishment_tier} 
+                          onChange={e => setFormData({...formData, establishment_tier: e.target.value})}
+                          className="w-full bg-aura-inner border border-aura-cyan/30 p-3 text-aura-cyan outline-none focus:border-aura-cyan uppercase"
+                        >
+                          <option value="BASIC">BASIC</option>
+                          <option value="PRO">PRO</option>
+                          <option value="PREMIUM">PREMIUM</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase opacity-40 block mb-1 text-aura-cyan font-bold">Category</label>
+                        <select 
+                          value={formData.establishment_category} 
+                          onChange={e => setFormData({...formData, establishment_category: e.target.value})}
+                          className="w-full bg-aura-inner border border-aura-cyan/30 p-3 text-aura-cyan outline-none focus:border-aura-cyan uppercase"
+                        >
+                          {CATEGORIES.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                   </div>
-
                 )}
 
                 <div className="flex gap-4 pt-4">
@@ -294,12 +386,16 @@ export default function App() {
   const [systemEvents, setSystemEvents] = useState<SystemEvent[]>(INITIAL_EVENTS);
   
   const [winningRatio, setWinningRatio] = useState(50);
-  const [flashCountdown, setFlashCountdown] = useState<number | null>(null);
-  
-  const queryParams = new URLSearchParams(window.location.search);
-  if (queryParams.has('id')) {
-    return <APUnit />;
+  const [flashCountdown, setFlashCountdown] = useState<number | null>(null);  
+
+  // =========================================================
+  // ENRUTADOR TÁCTICO: AP UNIT (SIMULACIÓN)
+  // =========================================================
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('mode') === 'apunit' || params.has('id')) {
+    return <APUnit />; // Si la URL tiene mode=apunit o un ID, frena aquí y pinta solo la placa
   }
+  // =========================================================
 
   // --- SINCRONIZACIÓN DE RANGO ---
   const loadUserContext = async (userId: string) => {
@@ -357,6 +453,8 @@ export default function App() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  
 
   useEffect(() => {
     if (flashCountdown !== null && flashCountdown > 0) {
