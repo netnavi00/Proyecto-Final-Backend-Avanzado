@@ -9,7 +9,7 @@ import { supabase } from './services/supabase';
 
 /* --- COMPONENTES MODULARES --- */
 import SandboxModule from './components/SandboxModule';
-import {LoginModule} from './components/LoginModule';
+import LoginModule from './components/LoginModule';
 import { AuraLogo } from './components/AuraLogo';
 import { TacticalGrid } from './components/TacticalGrid';
 import { CreativeLab } from './components/CreativeLab';
