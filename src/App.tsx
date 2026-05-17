@@ -1,13 +1,27 @@
 /// <reference types="vite/client" />
-import React, { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Activity, AlertTriangle, Monitor, Cpu, Server, Play, Copy, Maximize2, Crosshair, Map, X, Clock, Pencil, Users, Wifi, UserPlus, Trophy, Fingerprint, RefreshCw, Settings, ChevronLeft, ChevronRight, ShieldAlert, Globe, Key, ShieldCheck, LogOut, UserCog, Shield } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { createClient } from '@supabase/supabase-js';
-import { EventHorizon, SystemEvent } from './components/EventHorizon';
+import React, { useState, useEffect } from 'react';
+import { AnimatePresence, motion } from 'framer-motion'; 
+import { 
+  Map, Cpu, Crosshair, Settings, Users, ShieldCheck, LogOut, 
+  ChevronLeft, ChevronRight, Play, X, Pencil, Maximize2, Terminal 
+} from 'lucide-react';
 import { supabase } from './services/supabase';
 
-/* --- TYPES & MOCK DATA --- */
+/* --- COMPONENTES MODULARES --- */
+import SandboxModule from './components/SandboxModule';
+import {LoginModule} from './components/LoginModule';
+import { AuraLogo } from './components/AuraLogo';
+import { TacticalGrid } from './components/TacticalGrid';
+import { CreativeLab } from './components/CreativeLab';
+import { Orchester } from './components/Orchester';
+import { StaffManagement } from './components/StaffManagement';
+import { EventHorizon } from './components/EventHorizon';
+import APUnit from './components/APUnit';
+import { AuraCentral } from './components/AuraCentral';
+import { Endpoints } from './components/Endpoints';
+
+
+/* --- TYPES --- */
 export type TableStatus = 'online' | 'alert' | 'promo' | 'offline' | 'admin';
 export interface TableData {
   id: string;
@@ -16,7 +30,6 @@ export interface TableData {
   staffId: string | null;
   lastPing: number;
 }
-
 export interface StaffData {
   id: string;
   name: string;
@@ -25,379 +38,41 @@ export interface StaffData {
   tables: string[];
 }
 
-const INITIAL_STAFF: StaffData[] = [];
-const INITIAL_EVENTS: SystemEvent[] = [];
-const INITIAL_TABLES: TableData[] = [
-  { id: 'TBL-01', name: 'T01', status: 'online', staffId: null, lastPing: Date.now() },
-  { id: 'TBL-02', name: 'T02', status: 'online', staffId: null, lastPing: Date.now() },
-  { id: 'TBL-03', name: 'T03', status: 'online', staffId: null, lastPing: Date.now() }
-];
-
-import SandboxModule from './components/SandboxModule';
-import LoginModule from './components/LoginModule';
-import { AuraLogo } from './components/AuraLogo';
-import { TacticalGrid } from './components/TacticalGrid';
-import { CreativeLab } from './components/CreativeLab';
-import { Orchester } from './components/Orchester';
-import { StaffManagement } from './components/StaffManagement';
-import APUnit from './components/APUnit';
-
-const TIERS = ['BASIC', 'PRO', 'PREMIUM'];
-const CATEGORIES = ['PIZZA/PASTAS/ITALIANA', 'BAR', 'MEXICANA', 'ASIATICA', 'POSTRES/SNACKS', 'VEGETARIANA/GLUTEN-FREE/ENSALADAS', 'BEBIDAS','CARNES/CORTES', 'MARISCOS'];
-
-/* --- COMPONENTE FUNCIONAL: AURA CENTRAL --- */
-function AuraCentral() {
-  const [profiles, setProfiles] = useState<any[]>([]);
-  const [establishment, setEstablishment] = useState<any[]>([]);
-  const [devices, setDevices] = useState<any[]>([]); // Sincronizado para ver el inventario
-  const [loading, setLoading] = useState(false);
-  
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ id: '', full_name: '', role: 'admin', establishment_name: '' , establishment_tier: 'BASIC', establishment_category: '' });
-  const [deviceData, setDeviceData] = useState({id: '', establishment_id: ''});
-
- const loadData = async () => {
-  setLoading(true);
-  try {
-    const { data: profs, error: pErr } = await supabase.from('profiles').select('*').order('role', { ascending: false });
-    
-    // Consultas planas para evitar el GET 400 Bad Request
-    const { data: ests, error: eErr } = await supabase.from('establishments').select('*');
-    const { data: devs, error: dErr } = await supabase.from('devices').select('*'); 
-    
-    if (pErr) console.error("Error perfiles:", pErr.message);
-    if (eErr) console.error("Error locales:", eErr.message);
-    if (dErr) console.error("Error hardware:", dErr.message);
-
-    setProfiles(profs || []);
-    setEstablishment(ests || []);
-    setDevices(devs || []);
-  } catch (e) {
-    console.error("Central Load Error:", e);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  useEffect(() => { loadData(); }, []);
-
-  const handleAuthorize = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    
-    const { error: profileError } = await supabase.rpc('admin_upsert_profile', {
-      target_id: formData.id, 
-      new_name: formData.full_name.toUpperCase(), 
-      new_role: formData.role 
-    });
-
-    if (!profileError) {
-      if (formData.establishment_name.trim() !== '') {
-        const { error: estError } = await supabase.rpc('admin_create_establishment', {
-          p_name: formData.establishment_name.toUpperCase(),
-          p_owner_id: formData.id.toUpperCase(),
-          p_tier: formData.establishment_tier.toUpperCase(),
-          p_category: formData.establishment_category.toUpperCase()
-        });
-        if (estError) console.error("Error creando establecimiento:", estError.message);
-      }
-
-      setIsModalOpen(false);
-      setFormData({ id: '', full_name: '', role: 'admin', establishment_name: '', establishment_tier: 'BASIC', establishment_category: ''  });
-      await loadData();
-    } else {
-      alert("Error en autorización: " + profileError.message);
-    }
-    setLoading(false);
-  };
-
-  const handleRoleUpdate = async (userId: string, newRole: string) => {
-    const { error } = await supabase.rpc('update_user_role', {
-      target_user_id: userId,
-      new_role: newRole
-    });
-
-    if (!error) await loadData();
-    else console.error("Error updating role:", error.message);
-  };
-
-  const handleProvisionDevice = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const { error } = await supabase.rpc('admin_provision_device', {
-      p_id: deviceData.id,
-      p_establishment_id: deviceData.establishment_id
-    });
-
-    if (error) alert("Error: " + error.message);
-    else {
-      setDeviceData({ id: '', establishment_id: '' });
-      await loadData();
-    }
-    setLoading(false);
-  };
-
-  return (
-    <div className="space-y-10 pb-20">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <ShieldAlert size={32} className="text-[#a855f7] drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]" />
-          <div>
-            <h2 className="text-2xl font-black text-[#a855f7] tracking-widest uppercase">AURA Central</h2>
-            <p className="text-[10px] text-aura-green/50 uppercase tracking-[0.2em]">Rank Authorization Terminal</p>
-          </div>
-        </div>
-        <div className="flex gap-3">
-          <button 
-            onClick={() => { setFormData({id: '', full_name: '', role: 'admin', establishment_name: '', establishment_tier: 'BASIC', establishment_category: ''}); setIsModalOpen(true); }}
-            className="flex items-center gap-2 px-4 py-2 border-2 border-aura-cyan text-aura-cyan text-[11px] font-bold uppercase hover:bg-aura-cyan/10 transition-all"
-          >
-            <UserPlus size={14} /> + Admin
-          </button>
-          <button 
-            onClick={() => { setFormData({id: '', full_name: '', role: 'superadmin', establishment_name: '', establishment_tier: 'BASIC', establishment_category: ''}); setIsModalOpen(true); }}
-            className="flex items-center gap-2 px-4 py-2 border-2 border-[#a855f7] text-[#a855f7] text-[11px] font-bold uppercase hover:bg-[#a855f7]/10 transition-all"
-          >
-            <Shield size={14} /> + Super
-          </button>
-          <button onClick={loadData} disabled={loading} className="p-2 hover:bg-[#a855f7]/10 rounded-full transition-colors ml-4">
-            <RefreshCw size={20} className={`${loading ? 'animate-spin' : ''} text-[#a855f7]`} />
-          </button>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <SectionTitle>User Role Management</SectionTitle>
-        <div className="border-2 border-[#a855f7]/20 bg-aura-black/40 overflow-hidden font-mono text-[13px]">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-[#a855f7]/20 bg-[#a855f7]/5">
-                <th className="p-4 text-[10px] uppercase text-[#a855f7]">Profile / UUID Signature</th>
-                <th className="p-4 text-[10px] uppercase text-[#a855f7]">Current Rank</th>
-                <th className="p-4 text-[10px] uppercase text-[#a855f7] text-right">Operations</th>
-              </tr>
-            </thead>
-            <tbody>
-              {profiles.map((p) => (
-                <tr key={p.id} className="border-b border-aura-dark/30 hover:bg-[#a855f7]/5 transition-colors group">
-                  <td className="p-4">
-                    <div className="text-aura-text text-[13px] uppercase font-bold">{p.full_name || 'Unknown_Entity'}</div>
-                    <div className="text-[9px] opacity-30">{p.id}</div>
-                  </td>
-                  <td className="p-4">
-                    <span className={`px-2 py-0.5 text-[9px] font-bold uppercase border ${
-                      p.role === 'superadmin' ? 'border-[#a855f7] text-[#a855f7] shadow-[0_0_8px_rgba(168,85,247,0.3)]' :
-                      p.role === 'admin' ? 'border-aura-cyan text-aura-cyan' : 'border-aura-dark text-aura-green/40'
-                    }`}>
-                      {p.role || 'user'}
-                    </span>
-                  </td>
-                  <td className="p-4 text-right">
-                    <div className="flex justify-end gap-2 opacity-40 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => handleRoleUpdate(p.id, 'admin')} className="px-2 py-1 border border-aura-dark hover:border-aura-cyan text-[9px] uppercase transition-colors">Set Admin</button>
-                      <button onClick={() => handleRoleUpdate(p.id, 'superadmin')} className="px-2 py-1 border border-aura-dark hover:border-[#a855f7] text-[9px] uppercase transition-colors">Set Super</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <SectionTitle>Global Establishments Network</SectionTitle>
-        <div className="border-2 border-aura-dark bg-aura-black/40 overflow-hidden font-mono text-[13px]">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-aura-dark bg-aura-dark/30">
-                <th className="p-4 text-[10px] uppercase opacity-40 font-black">Node Name</th>
-                <th className="p-4 text-[10px] uppercase opacity-40 font-black">Tier</th>
-                <th className="p-4 text-[10px] uppercase opacity-40 font-black">Category</th>
-                <th className="p-4 text-[10px] uppercase opacity-40 font-black">Owner Handle</th>
-              </tr>
-            </thead>
-            <tbody>
-              {establishment.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center opacity-20 italic">
-                    NO_NODES_DETECTED_IN_GRID
-                  </td>
-                </tr>
-              ) : (
-                establishment.map((e) => (
-                  <tr key={e.id} className="border-b border-aura-dark/30 hover:bg-aura-dark/20 transition-colors">
-                    <td className="p-4 text-aura-text font-bold uppercase tracking-widest">{e.name}</td>
-                    <td className="p-4">
-                      <span className="px-2 py-1 border border-aura-cyan/50 text-aura-cyan text-[10px] font-bold uppercase">{e.tier}</span>
-                    </td>
-                    <td className="p-4 text-aura-text/70 uppercase">{e.category_id || 'N/A'}</td>
-                    <td className="p-4 text-aura-green font-bold uppercase">{e.owner?.full_name || 'System_Root'}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* --- NUEVA SECCIÓN: HARDWARE INVENTORY & PROVISIONING --- */}
-      <div className="space-y-4 pt-4">
-        <SectionTitle>Hardware Inventory & Provisioning</SectionTitle>
-        <form onSubmit={handleProvisionDevice} className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-aura-cyan/5 p-6 border border-aura-cyan/20 font-mono">
-          <div>
-            <label className="text-[10px] uppercase opacity-40 block mb-1 font-bold text-aura-cyan">RPi_Hardware_UUID</label>
-            <input 
-              required value={deviceData.id}
-              onChange={e => setDeviceData({...deviceData, id: e.target.value})}
-              placeholder="00000000-0000-0000..."
-              className="w-full bg-aura-inner border border-aura-dark p-3 text-aura-cyan font-mono text-xs outline-none focus:border-aura-cyan"
-            />
-          </div>
-          <div>
-           <label className="text-[10px] uppercase opacity-40 block mb-1 font-bold text-aura-cyan">Assign_To_Establishment</label>
-            <select 
-              required 
-              value={deviceData.establishment_id || ''}
-              onChange={e => setDeviceData({...deviceData, establishment_id: e.target.value})}
-              className="w-full bg-aura-inner border border-aura-cyan/30 p-3 text-aura-cyan outline-none focus:border-aura-cyan uppercase text-xs"
-            >
-              <option value="">Select_Establishment</option>
-              {establishment?.map(e => (
-                <option key={e.id} value={e.id}>{e.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-end">
-            <button type="submit" disabled={loading} className="w-full bg-aura-cyan text-black font-black p-3 uppercase hover:brightness-110 transition-all active:scale-95 disabled:opacity-50">
-              Provision_Unit
-            </button>
-          </div>
-        </form>
-
-        <div className="border border-aura-dark bg-aura-black/40 overflow-hidden font-mono text-[13px]">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-white/5 text-[10px] uppercase text-aura-cyan font-black tracking-widest">
-              <tr className="border-b border-aura-dark bg-aura-dark/30">
-                <th className="p-4 text-[10px] uppercase font-black">Device UUID</th>
-                <th className="p-4 text-[10px] uppercase font-black">Node Assigned</th>
-                <th className="p-4 text-[10px] uppercase font-black text-right">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-                {devices.length === 0 ? (
-                  <tr key="no-devices"><td colSpan={3} className="p-10 text-center opacity-20 italic">No hardware provisioned yet.</td></tr>
-                ) : (
-                  devices.map((d, i) => (
-                    <tr key={d.id || i} className="border-t border-aura-dark/20 opacity-70">
-                    <td className="p-4 font-mono opacity-60">{d.id}</td>
-                    <td className="p-4 uppercase text-aura-text font-bold">{d.establishment_id ? `NODO [${d.establishment_id.substring(0,8)}]` : 'Unassigned'}</td>
-                    <td className="p-4 text-right">
-                      <span className="text-aura-green font-bold">[{d.status || 'provisioned'}]</span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className="absolute inset-0 bg-black/90 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-aura-panel border-2 border-[#a855f7] p-8 max-w-md w-full relative z-[201] shadow-[0_0_50px_rgba(168,85,247,0.3)]">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-[#a855f7] font-black uppercase tracking-widest flex items-center gap-3"><UserCog size={20} /> Authorize {formData.role.toUpperCase()}</h3>
-                <button onClick={() => setIsModalOpen(false)} className="text-aura-text/40 hover:text-white transition-colors"><X size={20} /></button>
-              </div>
-              <form onSubmit={handleAuthorize} className="space-y-4 font-mono">
-                <div>
-                  <label className="text-[10px] uppercase opacity-40 block mb-1">User UUID (Authentication ID)</label>
-                  <input required value={formData.id} onChange={e => setFormData({...formData, id: e.target.value})} placeholder="Paste Auth UUID..." className="w-full bg-aura-inner border border-aura-dark p-3 text-aura-text outline-none focus:border-[#a855f7] text-xs" />
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase opacity-40 block mb-1">Full Name / Alias</label>
-                  <input required value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} placeholder="EJ: JUAN VEGA" className="w-full bg-aura-inner border border-aura-dark p-3 text-aura-text outline-none focus:border-[#a855f7] uppercase" />
-                </div>
-
-                {formData.role === 'admin' && (
-                  <div className="border-t border-aura-dark pt-4 mt-2">
-                    <label className="text-[10px] uppercase opacity-40 block mb-1 text-aura-cyan font-bold">Link Establishment (Node Name)</label>
-                    <input required={formData.role === 'admin'} value={formData.establishment_name} onChange={e => setFormData({...formData, establishment_name: e.target.value})} placeholder="EJ: ARCADE CHOLULA" className="w-full bg-aura-inner border border-aura-cyan/30 p-3 text-aura-cyan outline-none focus:border-aura-cyan uppercase" />
-                    <div className="grid grid-cols-2 gap-4 mt-4">
-                      <div>
-                        <label className="text-[10px] uppercase opacity-40 block mb-1 text-aura-cyan font-bold">Tier</label>
-                        <select 
-                          value={formData.establishment_tier} 
-                          onChange={e => setFormData({...formData, establishment_tier: e.target.value})}
-                          className="w-full bg-aura-inner border border-aura-cyan/30 p-3 text-aura-cyan outline-none focus:border-aura-cyan uppercase"
-                        >
-                          <option value="BASIC">BASIC</option>
-                          <option value="PRO">PRO</option>
-                          <option value="PREMIUM">PREMIUM</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] uppercase opacity-40 block mb-1 text-aura-cyan font-bold">Category</label>
-                        <select 
-                          value={formData.establishment_category} 
-                          onChange={e => setFormData({...formData, establishment_category: e.target.value})}
-                          className="w-full bg-aura-inner border border-aura-cyan/30 p-3 text-aura-cyan outline-none focus:border-aura-cyan uppercase"
-                        >
-                          {CATEGORIES.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex gap-4 pt-4">
-                  <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 border border-aura-dark text-aura-text/60 text-[11px] font-bold uppercase">Abort</button>
-                  <button type="submit" disabled={loading} className="flex-1 py-3 bg-[#a855f7] text-white text-[11px] font-black uppercase tracking-widest hover:brightness-110 disabled:opacity-50">{loading ? 'Committing...' : 'Grant Access'}</button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-/* --- MAIN COMPONENT --- */
 export default function App() {
+  // 1. CONTEXTO DE AUTENTICACIÓN
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [establishmentId, setEstablishmentId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // 2. CONTROL DE NAVEGACIÓN Y PANEL
   const [activeTab, setActiveTab] = useState<'grid' | 'lab' | 'orchester' | 'staff' | 'sandbox' | 'central'>('grid');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   
-  const [tables, setTables] = useState<TableData[]>(INITIAL_TABLES);
-  const [staffList, setStaffList] = useState<StaffData[]>(INITIAL_STAFF);
+  // 👇 NUEVO ESTADO: CONTROL DE LA VENTANA FLOTANTE DE ENDPOINTS 👇
+  const [showTerminal, setShowTerminal] = useState(false);
+  
+  // 3. ESTADOS DE RED (Sincronizados en caliente con la DB)
+  const [tables, setTables] = useState<TableData[]>([]);
+  const [staffList, setStaffList] = useState<StaffData[]>([]);
+  const [systemEvents] = useState<any[]>([]);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [tableToDelete, setTableToDelete] = useState<string | null>(null);
-  const [systemEvents, setSystemEvents] = useState<SystemEvent[]>(INITIAL_EVENTS);
   
+  // 4. SISTEMA DE GAMIFICATION & COUNTDOWNS
   const [winningRatio, setWinningRatio] = useState(50);
   const [flashCountdown, setFlashCountdown] = useState<number | null>(null);  
 
   // =========================================================
-  // ENRUTADOR TÁCTICO: AP UNIT (SIMULACIÓN)
+  // ENRUTADOR DE MARKETING (AISLAMIENTO DE PLACA APUNIT)
   // =========================================================
   const params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'apunit' || params.has('id')) {
-    return <APUnit />; // Si la URL tiene mode=apunit o un ID, frena aquí y pinta solo la placa
+    return <APUnit />;
   }
-  // =========================================================
 
-  // --- SINCRONIZACIÓN DE RANGO ---
+  // --- SINCRONIZACIÓN AUTOMÁTICA DE RANGO ---
   const loadUserContext = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -406,20 +81,17 @@ export default function App() {
         .eq('id', userId)
         .maybeSingle(); 
 
-      if (error) {
-        console.error("❌ Auth Sync Error:", error.message);
-        setUserRole('user');
-      } else {
-        setUserRole(data?.role || 'user');
-      }
+      if (error) throw error;
+      setUserRole(data?.role || 'user');
     } catch (err) {
-      console.error("⚠️ Fallo en contexto:", err);
+      console.error("⚠️ Error cargando rango del perfil:", err);
       setUserRole('user');
     } finally {
       setLoading(false);
     }
   };
   
+  // --- MONITOREO DE SESIÓN ACTIVA ---
   useEffect(() => {
     const initializeAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -454,8 +126,7 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  
-
+  // --- CONTADOR DE EVENTOS PROMO ---
   useEffect(() => {
     if (flashCountdown !== null && flashCountdown > 0) {
       const t = setTimeout(() => setFlashCountdown(flashCountdown - 1), 1000);
@@ -466,17 +137,39 @@ export default function App() {
     }
   }, [flashCountdown]);
 
+  // --- CARGA Y REALTIME DE HARDWARE (TACTICAL GRID) ---
   useEffect(() => {
     if (!establishmentId) return;
+    
     const fetchUnits = async () => {
-      const { data } = await supabase.from('devices').select('*, staff:current_staff_id (name)').eq('establishment_id', establishmentId);
-      if (data) setTables(data);
+      const { data, error } = await supabase
+        .from('devices')
+        .select('*')
+        .eq('establishment_id', establishmentId);
+        
+      if (error) {
+        console.error("❌ Error actualizando nodos en grid:", error.message);
+      } else if (data) {
+        setTables(data); 
+      }
     };
+
     fetchUnits();
-    const channel = supabase.channel('grid-updates').on('postgres_changes', { event: '*', schema: 'public', table: 'devices', filter: `establishment_id=eq.${establishmentId}` }, () => fetchUnits()).subscribe();
+
+    const channel = supabase
+      .channel('grid-updates')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'devices', 
+        filter: `establishment_id=eq.${establishmentId}` 
+      }, () => fetchUnits())
+      .subscribe();
+
     return () => { channel.unsubscribe(); };
   }, [establishmentId]);
 
+  // --- OPERACIONES DE NODOS LOCALES ---
   const handleAddTable = () => {
     const newId = `TBL-${String(tables.length + 1).padStart(2, '0')}`;
     const newTable: TableData = { id: newId, name: `T${String(tables.length + 1).padStart(2, '0')}`, status: 'offline', staffId: null, lastPing: Date.now() };
@@ -497,12 +190,12 @@ export default function App() {
   };
 
   if (loading) return <div className="h-screen bg-black flex items-center justify-center text-aura-cyan animate-pulse tracking-[1em] font-mono text-xs uppercase italic">Aura_OS_Booting...</div>;
-
   if (!isAuthenticated) return <LoginModule onLoginSuccess={() => {}} />;
 
   return (
-    <div className="min-h-screen h-screen bg-aura-panel text-aura-green font-mono flex flex-col overflow-hidden p-[18px] border-4 border-aura-dark select-none text-[13px]">
+    <div className="min-h-screen h-screen bg-aura-panel text-aura-green font-mono flex flex-col overflow-hidden p-[18px] border-4 border-aura-dark select-none text-[13px] relative">
       
+      {/* --- CORE CONTROL HEADER --- */}
       <header className="flex justify-between items-center border-b-2 border-aura-green/30 pb-4 mb-[18px] shrink-0 z-10">
         <div className="flex items-center gap-[26px]">
           <div className="flex items-center gap-4">
@@ -546,7 +239,10 @@ export default function App() {
         </button>
       </header>
 
+      {/* --- DASHBOARD WRAPPER --- */}
       <div className="flex flex-1 overflow-hidden gap-[18px]">
+        
+        {/* SIDEBAR NAVIGATION */}
         <aside className={`${isSidebarCollapsed ? 'w-20 items-center' : 'w-64 p-[18px]'} bg-aura-panel border-2 border-aura-dark flex flex-col shrink-0 z-10 transition-all duration-300 relative`}>
           {isSidebarCollapsed ? (
             <div className="py-4 w-full flex justify-center">
@@ -573,7 +269,7 @@ export default function App() {
             <NavButton active={activeTab === 'sandbox'} onClick={() => setActiveTab('sandbox')} icon={<Settings size={16} />} label="Sandbox" collapsed={isSidebarCollapsed} />
             <NavButton active={activeTab === 'staff'} onClick={() => setActiveTab('staff')} icon={<Users size={16} />} label="Staff & NFC" collapsed={isSidebarCollapsed} />
             
-            {(userRole === 'superadmin' || userRole === 'admin') && (
+            {userRole === 'superadmin' && (
               <>
                 <div className="border-t border-aura-green/30 my-2 w-full"></div>
                 <NavButton 
@@ -599,32 +295,49 @@ export default function App() {
           </div>
         </aside>
 
+        {/* WORKSPACE AREA */}
         <main className="flex-1 bg-aura-panel border-2 border-aura-dark p-[18px] relative overflow-hidden flex flex-col font-mono text-[13px]">
-          <AnimatePresence mode="wait">
-            {activeTab === 'grid' && (
-              <motion.div key="grid" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="w-full h-full p-[26px] overflow-y-auto">
-                <TacticalGrid tables={tables} staffList={staffList} onTableSelect={(id:string) => setSelectedTableId(id)} onAddTable={handleAddTable} onRemoveTable={handleRemoveTable} />
-              </motion.div>
-            )}
-            {activeTab === 'lab' && (
-              <motion.div key="lab" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="w-full h-full p-[26px] overflow-y-auto"><CreativeLab /></motion.div>
-            )}
-            {activeTab === 'orchester' && (
-              <motion.div key="orchester" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full h-full p-[26px] overflow-y-auto">
-                <Orchester tables={tables} winningRatio={winningRatio} setWinningRatio={setWinningRatio} onFlashAction={() => { setFlashCountdown(15); setTables(prev => prev.map(t => ({ ...t, status: 'promo' }))); }} isFlashActive={flashCountdown !== null} flashTime={flashCountdown} />
-              </motion.div>
-            )}
-            {activeTab === 'staff' && (
-              <motion.div key="staff" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full h-full p-[26px] overflow-y-auto"><StaffManagement staffList={staffList} setStaffList={setStaffList} tables={tables} /></motion.div>
-            )}
-            {activeTab === 'central' && (
-              <motion.div key="central" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full h-full p-[26px] overflow-y-auto"><AuraCentral /></motion.div>
-            )}
-            {activeTab === 'sandbox' && (
-              <motion.div key="sandbox" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full h-full overflow-hidden"><SandboxModule /></motion.div>
-            )}
-          </AnimatePresence>
+          <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
+            <AnimatePresence mode="wait">
+              {activeTab === 'grid' && (
+                <motion.div key="grid" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="w-full h-full p-[26px] overflow-y-auto">
+                  <TacticalGrid tables={tables} staffList={staffList} onTableSelect={(id:string) => setSelectedTableId(id)} onAddTable={handleAddTable} onRemoveTable={handleRemoveTable} />
+                </motion.div>
+              )}
+              {activeTab === 'lab' && (
+                <motion.div key="lab" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="w-full h-full p-[26px] overflow-y-auto"><CreativeLab /></motion.div>
+              )}
+              {activeTab === 'orchester' && (
+                <motion.div key="orchester" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full h-full p-[26px] overflow-y-auto">
+                  <Orchester tables={tables} winningRatio={winningRatio} setWinningRatio={setWinningRatio} onFlashAction={() => { setFlashCountdown(15); setTables(prev => prev.map(t => ({ ...t, status: 'promo' }))); }} isFlashActive={flashCountdown !== null} flashTime={flashCountdown} />
+                </motion.div>
+              )}
+              {activeTab === 'staff' && (
+                <motion.div key="staff" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full h-full p-[26px] overflow-y-auto"><StaffManagement staffList={staffList} setStaffList={setStaffList} tables={tables} /></motion.div>
+              )}
+              {activeTab === 'central' && (
+                <motion.div key="central" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full h-full p-[26px] overflow-y-auto">
+                  {userRole === 'superadmin' ? (
+                    <AuraCentral />
+                  ) : (
+                    /* TERMINAL DE ACCESO DENEGADO */
+                    <div className="h-full flex flex-col items-center justify-center font-mono text-center space-y-4 border-2 border-aura-red/30 bg-aura-red/5 p-8 rounded-lg">
+                      <div className="w-3 h-3 bg-aura-red rounded-full animate-ping shadow-[0_0_10px_#ff003c]" />
+                      <h2 className="text-2xl font-black text-aura-red uppercase tracking-widest">CRITICAL_SECURITY_BREACH</h2>
+                      <p className="text-xs text-aura-text/60 max-w-md uppercase tracking-wider">
+                        Access denied. Your current clearance level <span className="text-aura-cyan">[{userRole}]</span> is insufficient to uplink with AURA ROOT TERMINAL. This incident has been logged.
+                      </p>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+              {activeTab === 'sandbox' && (
+                <motion.div key="sandbox" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full h-full overflow-hidden"><SandboxModule /></motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
+          {/* OVERLAY TELEMETRÍA: DRAWERS */}
           <AnimatePresence>
             {selectedTableId && (
               <>
@@ -641,17 +354,57 @@ export default function App() {
           </AnimatePresence>
         </main>
 
+        {/* FEED LATERAL DE EVENTOS */}
         <EventHorizon events={systemEvents} onSelectUnit={(id:string) => { setActiveTab('grid'); setSelectedTableId(id); }} activeNodesCount={tables.filter(t => t.status !== 'offline').length} totalNodesCount={tables.length} />
       </div>
       
+      {/* 👇 VENTANA FLOTANTE "POR APARTE" DE ENDPOINTS CON ANIMACIÓN TÁCTICA 👇 */}
+      <AnimatePresence>
+        {userRole === 'superadmin' && showTerminal && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.95 }}
+            className="fixed top-[100px] right-[420px] bottom-[80px] w-[650px] bg-zinc-950/95 backdrop-blur-md border-2 border-aura-cyan shadow-[0_0_50px_rgba(0,243,255,0.2)] z-50 flex flex-col p-2"
+          >
+            {/* BARRA DE TÍTULO DE LA VENTANA */}
+            <div className="flex justify-between items-center bg-zinc-900 px-3 py-1.5 border-b border-aura-cyan/30 text-[11px] font-bold text-aura-cyan">
+              <span className="flex items-center gap-2"><Terminal size={12}/> [SYS_UPLINK_CONSOLE] // ISOLATED_MODE</span>
+              <button 
+                onClick={() => setShowTerminal(false)}
+                className="text-zinc-500 hover:text-aura-red uppercase font-black px-1.5 hover:bg-aura-red/10 transition-colors"
+              >
+                [X]
+              </button>
+            </div>
+            {/* CONTENIDO INTERNO CON SCROLL PROPIO */}
+            <div className="flex-1 overflow-y-auto p-2">
+              <Endpoints />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* SYSTEM SYSTEM FOOTER */}
       <footer className="mt-[18px] pt-2 border-t border-aura-dark flex justify-between items-center text-[11px] opacity-60 shrink-0 font-mono tracking-widest uppercase">
-        <div className="flex gap-[26px]">
+        <div className="flex gap-[26px] items-center">
           <span>DB: CONNECTED</span>
           <span className="text-aura-cyan">Uplink: {organizationId?.slice(0, 8)}...</span>
+          
+          {/* 👇 BOTÓN DE ACCESO RÁPIDO PARA ACTIVAR LA VENTANA FLOTANTE 👇 */}
+          {userRole === 'superadmin' && (
+            <button
+              onClick={() => setShowTerminal(!showTerminal)}
+              className={`ml-4 px-2 py-0.5 border flex items-center gap-1.5 font-bold transition-all ${showTerminal ? 'bg-aura-cyan text-black border-aura-cyan animate-pulse' : 'text-aura-cyan border-aura-cyan/30 hover:bg-aura-cyan/10'}`}
+            >
+              <Terminal size={12}/> {showTerminal ? 'CLOSE_TERMINAL' : 'OPEN_TERMINAL'}
+            </button>
+          )}
         </div>
         <span>LATENCY: 12ms</span>
       </footer>
 
+      {/* MODAL DE CONFIRMACIÓN DE BORRADO */}
       <AnimatePresence>
         {tableToDelete && (
           <ConfirmModal title="Confirm Node Deletion" message={`Are you sure you want to permanently delete ${tableToDelete}?`} onConfirm={confirmRemoveTable} onCancel={() => setTableToDelete(null)} />
@@ -661,7 +414,7 @@ export default function App() {
   );
 }
 
-/* --- UI COMPONENTS ORIGINALES --- */
+/* --- UI SUB-COMPONENTS --- */
 function NavButton({ active, onClick, icon, label, collapsed, customClass }: any) {
   return (
     <div className="relative group w-full">
@@ -673,9 +426,10 @@ function NavButton({ active, onClick, icon, label, collapsed, customClass }: any
   );
 }
 
-function LiveMirrorDrawer({ table, staff, onClose, onRename, onToggleAdmin }: any) {
+function LiveMirrorDrawer({ table, staff, onClose, onRename }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
+  
   useEffect(() => { if (table && !isEditing) setEditName(table.name); }, [table?.name, isEditing]);
   if (!table) return null;
 
@@ -705,14 +459,6 @@ function LiveMirrorDrawer({ table, staff, onClose, onRename, onToggleAdmin }: an
       </div>
     </motion.div>
   );
-}
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <div className="text-[12px] text-aura-green/50 uppercase tracking-[0.2em] mb-[18px] border-b border-aura-green/10 pb-2 font-black">{children}</div>;
-}
-
-function StatBox({ label, value }: { label: string, value: string }) {
-  return <div className="border-2 border-aura-green/20 p-[14px] bg-aura-green/5"><div className="text-[12px] uppercase text-aura-green/50 mb-1">{label}</div><div className="text-[15px] font-bold text-aura-green tracking-widest">{value}</div></div>;
 }
 
 function ConfirmModal({ title, message, onConfirm, onCancel }: any) {
