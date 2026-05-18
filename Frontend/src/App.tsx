@@ -8,17 +8,17 @@ import {
 import { supabase } from './services/supabase';
 
 /* --- COMPONENTES MODULARES --- */
-import SandboxModule from './components/SandboxModule';
-import LoginModule from './components/LoginModule';
-import { AuraLogo } from './components/AuraLogo';
-import { TacticalGrid } from './components/TacticalGrid';
-import { CreativeLab } from './components/CreativeLab';
-import { Orchester } from './components/Orchester';
-import { StaffManagement } from './components/StaffManagement';
-import { EventHorizon } from './components/EventHorizon';
-import APUnit from './components/APUnit';
-import { AuraCentral } from './components/AuraCentral';
-import { Endpoints } from './components/Endpoints';
+import SandboxModule from './components/widgets/SandboxModule';
+import LoginModule from './components/views/LoginModule';
+import { AuraLogo } from './components/ui/AuraLogo';
+import { TacticalGrid } from './components/widgets/TacticalGrid';
+import { CreativeLab } from './components/widgets/CreativeLab';
+import { Orchester } from './components/widgets/Orchester';
+import { StaffManagement } from './components/widgets/StaffManagement';
+import { EventHorizon } from './components/widgets/EventHorizon';
+import APUnit from './components/ui/APUnit';
+import { AuraCentral } from './components/views/AuraCentral';
+import { Endpoints } from './components/widgets/Endpoints';
 
 
 /* --- TYPES --- */

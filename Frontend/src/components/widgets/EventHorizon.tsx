@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Zap, CheckCircle, Terminal, AlertTriangle, ChevronsRight, Activity } from 'lucide-react';
-import { supabase } from '../services/supabase';
+import { supabase } from '../../services/supabase';
 
 export interface SystemEvent {
   id: string;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { LogOut, Power } from 'lucide-react';
-import { supabase } from '../services/supabase';
+import { supabase } from '../../services/supabase';
 import { motion } from 'motion/react';
 
 interface LogoutButtonProps {

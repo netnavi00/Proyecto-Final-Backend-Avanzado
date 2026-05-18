@@ -1,8 +1,8 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { X } from 'lucide-react';
-import type { TableData, StaffData } from '../App';
-import { supabase } from '../services/supabase';
+import type { TableData, StaffData } from '../../App';
+import { supabase } from '../../services/supabase';
 
 export function TacticalGrid({ tables, staffList, onTableSelect, onAddTable, onRemoveTable }: { tables: TableData[], staffList: StaffData[], onTableSelect: (id: string) => void, onAddTable: () => void, onRemoveTable: (id: string) => void }) {
   return (

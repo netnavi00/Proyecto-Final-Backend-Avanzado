@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Lock, AlertTriangle, ShieldCheck } from 'lucide-react';
-import { supabase, SUPABASE_URL } from '../services/supabase';
-import { AuraLogo } from './AuraLogo';
+import { supabase, SUPABASE_URL } from '../../services/supabase';
+import { AuraLogo } from '../ui/AuraLogo';
 
 interface LoginModuleProps {
   onLoginSuccess: (establishmentId: string) => void;

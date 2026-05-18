@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { AlertTriangle, Activity, RefreshCw } from 'lucide-react';
-import { supabase } from '../services/supabase';
+import { supabase } from '../../services/supabase';
 
 export function Orchester({ tables, winningRatio, setWinningRatio, onFlashAction, isFlashActive, flashTime }: any) {
   const [pulseActive, setPulseActive] = useState(false);

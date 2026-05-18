@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Fingerprint, Wifi, Trophy } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import type { TableData, StaffData } from '../App';
-import { supabase } from '../services/supabase';
+import type { TableData, StaffData } from '../../App';
+import { supabase } from '../../services/supabase';
 
 export const CustomChartTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {

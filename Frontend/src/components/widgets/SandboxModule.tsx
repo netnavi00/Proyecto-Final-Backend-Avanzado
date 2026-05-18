@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { supabase } from '../services/supabase';
+import { supabase } from '../../services/supabase';
 import { Split, GitMerge, RotateCw, Settings, PlaySquare, Save, ChevronRight, Activity, Command, Zap, Trash2, Plus } from 'lucide-react';
 
 export default function SandboxModule() {

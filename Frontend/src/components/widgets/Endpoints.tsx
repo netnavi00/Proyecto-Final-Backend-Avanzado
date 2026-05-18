@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '../services/supabase'; 
+import { supabase } from '../../services/supabase'; 
 import { Database, Plus, RefreshCw, Trash2, Edit3, Terminal, Code } from 'lucide-react';
 
 interface LogEntry {

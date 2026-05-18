@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react'; // <-- Importamos useRef
-import { supabase } from '../services/supabase';
+import { supabase } from '../../services/supabase';
 import { Cpu, Activity } from 'lucide-react';
 
 export default function APUnit() {

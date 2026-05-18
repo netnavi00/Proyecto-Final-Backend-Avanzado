@@ -1,9 +1,10 @@
+import { Endpoints } from '../widgets/Endpoints';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion'; 
 import { 
   ShieldAlert, RefreshCw, UserPlus, UserCog, Shield, X, Globe, Cpu, HardDrive 
 } from 'lucide-react';
-import { supabase } from '../services/supabase';
+import { supabase } from '../../services/supabase';
 
 const TIERS = ['BASIC', 'PRO', 'PREMIUM'];
 const CATEGORIES = ['PIZZA/PASTAS/ITALIANA', 'BAR', 'MEXICANA', 'ASIATICA', 'POSTRES/SNACKS', 'VEGETARIANA/GLUTEN-FREE/ENSALADAS', 'BEBIDAS','CARNES/CORTES', 'MARISCOS'];

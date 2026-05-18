@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
-import { supabase } from '../services/supabase';
+import { supabase } from '../../services/supabase';
 
 /* --- CREATIVE LAB TYPES & MOCK --- */
 export type LayoutType = 'full' | 'split' | 'focus';
