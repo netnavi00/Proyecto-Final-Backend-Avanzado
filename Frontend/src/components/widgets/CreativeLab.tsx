@@ -37,6 +37,39 @@ export const DEFAULT_CATALOG: CatalogItem[] = [
   { id: 'm5', type: 'marketing', name: 'LADIES NIGHT', imageUrl: 'https://loremflickr.com/300/300/party,girls?lock=21' },
 ];
 
+export const PRESETS_MARKETING_IMAGES = [
+  { name: 'Fondo Neon Grid', url: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?q=80&w=500&auto=format&fit=crop' },
+  { name: 'Pizza Humante', url: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=500&auto=format&fit=crop' },
+  { name: 'Cerveza Helada', url: 'https://images.unsplash.com/photo-1608270586620-248524c67de9?q=80&w=500&auto=format&fit=crop' },
+  { name: 'Alitas de Pollo Fuego', url: 'https://images.unsplash.com/photo-1567620832903-9fc6debc209f?q=80&w=500&auto=format&fit=crop' },
+  { name: 'Cóctel Cyberpunk', url: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?q=80&w=500&auto=format&fit=crop' }
+];
+
+/* --- COMBOS DE DISEÑO (ESTILOS PRECONFIGURADOS) --- */
+export const DESIGN_PRESETS: Record<string, Partial<SlotConfig>> = {
+  ofertaFlash: {
+    customTextSize: 32,
+    neonColor: '#ff003c', // Rojo intenso
+    sticker: '2x1 PROMO',
+    stickerSize: 14,
+    bgOpacity: 0.9
+  },
+  cyberPremium: {
+    customTextSize: 28,
+    neonColor: '#00e5ff', // Cyan firma
+    sticker: 'RECOMMENDED',
+    stickerSize: 11,
+    bgOpacity: 0.7
+  },
+  minimalista: {
+    customTextSize: 22,
+    neonColor: '#ffffff', // Blanco limpio
+    sticker: null,
+    stickerSize: 12,
+    bgOpacity: 0.5
+  }
+};
+
 export interface SlotConfig {
   boundItemId: string | null;
   customText: string | null;
@@ -189,10 +222,10 @@ export function CreativeLab() {
         </button>
       </h2>
       
-      <div className="flex-1 flex flex-col xl:flex-row gap-[26px] max-w-7xl mx-auto w-full items-stretch min-h-0">
+      <div className="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-[26px] max-w-7xl mx-auto w-full items-stretch min-h-0 min-w-0">
         
         {/* LEFT PANEL: CATALOG */}
-        <div className="w-full xl:w-1/4 flex flex-col gap-[18px] border-2 border-aura-dark bg-aura-inner p-[18px] shrink-0 overflow-y-auto">
+        <div className="w-full xl:col-span-3 flex flex-col gap-[18px] border-2 border-aura-dark bg-aura-inner p-[18px] overflow-y-auto min-h-0">
           <h3 className="text-[12px] uppercase text-aura-green/60 font-bold tracking-widest border-b border-aura-dark pb-2">Data Binding Catalog</h3>
           <p className="text-[12px] text-aura-green/40">Select a slot in the canvas, then select an item to bind.</p>
 
@@ -238,7 +271,7 @@ export function CreativeLab() {
         </div>
 
         {/* CENTER PANEL: CANVAS TWIN */}
-        <div className="w-full xl:w-2/4 flex flex-col">
+        <div className="w-full xl:col-span-5 flex flex-col min-w-0">
           <div className="flex justify-between items-center mb-[9px]">
             <h3 className="text-[12px] uppercase text-aura-green/60 font-bold tracking-widest">Digital Twin Canvas</h3>
             <button 
@@ -304,10 +337,11 @@ export function CreativeLab() {
         </div>
 
         {/* RIGHT PANEL: PROPERTIES */}
-        <div className="w-full xl:w-1/4 flex flex-col gap-[26px] shrink-0 overflow-y-auto">
-          <div className="flex flex-col gap-[14px] p-[18px] border-2 border-aura-dark bg-aura-inner">
+        <div className="w-full xl:col-span-4 flex flex-col gap-[26px] overflow-y-auto pr-1 min-h-0">
+          
+          {/* CONTROL: CANVAS OPTIONS */}
+          <div className="flex flex-col gap-[14px] p-[18px] border-2 border-aura-dark bg-aura-inner shrink-0">
             <h3 className="text-[12px] uppercase text-aura-green/60 font-bold tracking-widest border-b border-aura-dark pb-2 mb-[9px]">Canvas Options</h3>
-            
             <div className="flex flex-col gap-1 mt-[9px]">
               <label className="text-[12px] uppercase opacity-60">Page Layout Engine</label>
               <div className="grid grid-cols-3 gap-[9px]">
@@ -324,7 +358,85 @@ export function CreativeLab() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-[14px] p-[18px] border-2 border-aura-cyan/30 bg-aura-inner/80 shadow-[0_0_20px_rgba(0,229,255,0.05)]">
+          {/* CONTROL: PLANTILLAS DE ESTILO RÁPIDAS */}
+          <div className="flex flex-col gap-[14px] p-[18px] border-2 border-purple-500/30 bg-aura-inner shrink-0">
+            <h3 className="text-[12px] uppercase text-purple-400 font-bold tracking-widest border-b border-purple-500/30 pb-2 mb-[9px]">
+              ⚡ Estilos Rápidos
+            </h3>
+            <p className="text-[11px] text-aura-green/40">Aplica combinaciones estéticas preconfiguradas con un solo clic:</p>
+            
+            <div className="flex flex-col gap-[9px]">
+              <button
+                type="button"
+                onClick={() => updateSlot(DESIGN_PRESETS.ofertaFlash)}
+                className="w-full text-left py-2 px-3 text-[11px] font-bold uppercase bg-red-950/40 border border-red-500/40 hover:bg-red-500/20 text-red-400 flex justify-between items-center"
+              >
+                <span>🔥 Oferta Flash Camicace</span>
+                <span className="text-[9px] border border-red-500/30 px-1 font-mono">ROJO / 2X1</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => updateSlot(DESIGN_PRESETS.cyberPremium)}
+                className="w-full text-left py-2 px-3 text-[11px] font-bold uppercase bg-cyan-950/40 border border-aura-cyan/40 hover:bg-cyan-950/20 text-aura-cyan flex justify-between items-center"
+              >
+                <span>🔮 Cyberpunk Premium</span>
+                <span className="text-[9px] border border-aura-cyan/30 px-1 font-mono">CYAN / RECOM</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => updateSlot(DESIGN_PRESETS.minimalista)}
+                className="w-full text-left py-2 px-3 text-[11px] font-bold uppercase bg-slate-950/40 border border-slate-500/40 hover:bg-slate-500/20 text-slate-300 flex justify-between items-center"
+              >
+                <span>🏳️ Elegante Minimal</span>
+                <span className="text-[9px] border border-slate-500/30 px-1 font-mono">BLANCO / LIMPIO</span>
+              </button>
+            </div>
+          </div>
+
+          {/* CONTROL: BIBLIOTECA PREDISEÑADA DE STOCK */}
+          <div className="flex flex-col gap-[14px] p-[18px] border-2 border-aura-dark bg-aura-inner shrink-0">
+            <h3 className="text-[12px] uppercase text-aura-green/60 font-bold tracking-widest border-b border-aura-dark pb-2 mb-[9px]">
+              🖼️ Biblioteca Prediseñada de Stock
+            </h3>
+            <p className="text-[11px] text-aura-green/40">¿No tienes imágenes? Selecciona un activo pre-cargado de alta calidad:</p>
+            
+            <div className="grid grid-cols-2 gap-[9px]">
+              {PRESETS_MARKETING_IMAGES.map((img, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    const stockId = `stock-${idx}`;
+                    if (!catalog.some(c => c.id === stockId)) {
+                      const stockItem: CatalogItem = {
+                        id: stockId,
+                        type: 'marketing',
+                        name: img.name.toUpperCase(),
+                        imageUrl: img.url
+                      };
+                      setCatalog(prev => [stockItem, ...prev]);
+                    }
+                    updateSlot({ boundItemId: stockId });
+                  }}
+                  className="group relative h-16 border border-aura-dark hover:border-aura-cyan overflow-hidden flex items-end p-1"
+                >
+                  <div 
+                    className="absolute inset-0 bg-cover bg-center transition-transform group-hover:scale-110" 
+                    style={{ backgroundImage: `url(${img.url})` }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent opacity-80" />
+                  <span className="relative z-10 text-[9px] font-bold uppercase tracking-tighter text-white truncate w-full text-left">
+                    {img.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* CONTROL: ESTÉTICA SELECCIONADA */}
+          <div className="flex flex-col gap-[14px] p-[18px] border-2 border-aura-cyan/30 bg-aura-inner/80 shadow-[0_0_20px_rgba(0,229,255,0.05)] shrink-0">
             <h3 className="text-[12px] uppercase text-aura-cyan font-bold tracking-widest border-b border-aura-cyan/30 pb-2 mb-[9px]">Estética Seleccionada [{selectedSlotId}]</h3>
             
             <div className="flex flex-col gap-[9px]">
@@ -358,9 +470,10 @@ export function CreativeLab() {
                   {['#00e5ff', 'var(--color-aura-green)', '#ff003c', '#ffffff', '#a855f7'].map(c => (
                     <button 
                       key={c}
+                      type="button"
                       onClick={() => updateSlot({ neonColor: c })}
                       className={`w-6 h-6 rounded-sm border-2 ${activeSlot?.neonColor === c ? 'border-white scale-110 shadow-[0_0_10px_currentColor]' : 'border-transparent'}`}
-                      style={{ backgroundColor: c, color: c }} // color is used for shadow
+                      style={{ backgroundColor: c, color: c }}
                     />
                   ))}
                </div>
@@ -416,6 +529,7 @@ export function CreativeLab() {
                <span>Prices are bound to the catalog. Aesthetic changes applied immediately.</span>
             </div>
           </div>
+
         </div>
       </div>
     </div>

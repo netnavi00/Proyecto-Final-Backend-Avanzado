@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion'; 
 import { 
   Map, Cpu, Crosshair, Settings, Users, ShieldCheck, LogOut, 
-  ChevronLeft, ChevronRight, Play, X, Pencil, Maximize2, Terminal 
+  ChevronLeft, ChevronRight, Play, X, Pencil, Maximize2, Terminal,
+  ZoomIn, ZoomOut, Maximize
 } from 'lucide-react';
 import { supabase } from './services/supabase';
 
@@ -20,7 +21,6 @@ import APUnit from './components/ui/APUnit';
 import { AuraCentral } from './components/views/AuraCentral';
 import { Endpoints } from './components/widgets/Endpoints';
 
-
 /* --- TYPES --- */
 export type TableStatus = 'online' | 'alert' | 'promo' | 'offline' | 'admin';
 export interface TableData {
@@ -28,7 +28,10 @@ export interface TableData {
   name: string;
   status: TableStatus;
   staffId: string | null;
-  lastPing: number;
+  grid_x: number;
+  grid_y: number;
+  establishment_id: string; 
+  assigned_element_id?: string | null;
 }
 export interface StaffData {
   id: string;
@@ -39,6 +42,16 @@ export interface StaffData {
 }
 
 export default function App() {
+  // 🚀 DETECTOR DE MODO HARDWARE RAÍZ: 
+  // Intercepta si viene explícitamente el parámetro de modo esclavo (?mode=apunit)
+  // Evita colisiones de enrutamiento estático y soluciona el error de red 404
+  const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+  const isHardwareMode = params.get('mode') === 'apunit';
+
+  if (isHardwareMode) {
+    return <APUnit />;
+  }
+
   // 1. CONTEXTO DE AUTENTICACIÓN
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [organizationId, setOrganizationId] = useState<string | null>(null);
@@ -50,41 +63,51 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'grid' | 'lab' | 'orchester' | 'staff' | 'sandbox' | 'central'>('grid');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   
-  // 👇 NUEVO ESTADO: CONTROL DE LA VENTANA FLOTANTE DE ENDPOINTS 👇
+  // CONTROL DE LA VENTANA FLOTANTE DE ENDPOINTS
   const [showTerminal, setShowTerminal] = useState(false);
   
-  // 3. ESTADOS DE RED (Sincronizados en caliente con la DB)
+  // CONTROL DE ZOOM PARA EL TACTICAL GRID
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  
+  // 3. ESTADOS DE RED
   const [tables, setTables] = useState<TableData[]>([]);
   const [staffList, setStaffList] = useState<StaffData[]>([]);
   const [systemEvents] = useState<any[]>([]);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [tableToDelete, setTableToDelete] = useState<string | null>(null);
+  const [liveTelemetry, setLiveTelemetry] = useState<any>(null);
   
   // 4. SISTEMA DE GAMIFICATION & COUNTDOWNS
   const [winningRatio, setWinningRatio] = useState(50);
   const [flashCountdown, setFlashCountdown] = useState<number | null>(null);  
 
-  // =========================================================
-  // ENRUTADOR DE MARKETING (AISLAMIENTO DE PLACA APUNIT)
-  // =========================================================
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('mode') === 'apunit' || params.has('id')) {
-    return <APUnit />;
-  }
-
-  // --- SINCRONIZACIÓN AUTOMÁTICA DE RANGO ---
+  // --- SINCRONIZACIÓN AUTOMÁTICA DE CONTEXTO REAL ---
   const loadUserContext = async (userId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data: profileData, error: profileErr } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', userId)
         .maybeSingle(); 
 
-      if (error) throw error;
-      setUserRole(data?.role || 'user');
+      if (profileErr) throw profileErr;
+      setUserRole(profileData?.role || 'user');
+
+      const { data: estData, error: estErr } = await supabase
+        .from('establishments')
+        .select('id')
+        .eq('owner_id', userId)
+        .limit(1)
+        .maybeSingle();
+
+      if (!estErr && estData) {
+        setEstablishmentId(estData.id); 
+      } else {
+        setEstablishmentId(userId);
+      }
+
     } catch (err) {
-      console.error("⚠️ Error cargando rango del perfil:", err);
+      console.error("⚠️ Error cargando contexto de seguridad Aura OS:", err);
       setUserRole('user');
     } finally {
       setLoading(false);
@@ -97,7 +120,6 @@ export default function App() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setOrganizationId(session.user.id);
-        setEstablishmentId(session.user.id);
         setIsAuthenticated(true); 
         await loadUserContext(session.user.id); 
       } else {
@@ -111,7 +133,6 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
         setOrganizationId(session.user.id);
-        setEstablishmentId(session.user.id);
         setIsAuthenticated(true);
         loadUserContext(session.user.id);
       } else if (event === 'SIGNED_OUT') {
@@ -126,6 +147,60 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // --- SUSCRIPCIÓN DEDICADA REALTIME TELEMETRÍA (VERSION BLINDADA) ---
+  useEffect(() => {
+    let isMounted = true; 
+    let channel: any = null;
+
+    if (!selectedTableId) {
+      setLiveTelemetry(null);
+      return;
+    }
+
+    const fetchTelemetry = async () => {
+      try {
+        if (!supabase) return;
+
+        const { data } = await supabase
+          .from('device_telemetry')
+          .select('*')
+          .eq('device_id', selectedTableId)
+          .maybeSingle(); 
+        
+        if (isMounted && data) {
+          setLiveTelemetry(data);
+        }
+      } catch (err) {
+        console.error("⚠️ Error asíncrono en fetchTelemetry (Aura OS):", err);
+      }
+    };
+    
+    fetchTelemetry();
+
+    if (supabase) {
+      channel = supabase
+        .channel(`app-telemetry-${selectedTableId}`)
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'device_telemetry', 
+          filter: `device_id=eq.${selectedTableId}` 
+        }, (payload: any) => {
+          if (isMounted && payload.new) {
+            setLiveTelemetry(payload.new);
+          }
+        })
+        .subscribe();
+    }
+
+    return () => { 
+      isMounted = false; 
+      if (channel && supabase) {
+        supabase.removeChannel(channel); 
+      }
+    };
+  }, [selectedTableId]);
+
   // --- CONTADOR DE EVENTOS PROMO ---
   useEffect(() => {
     if (flashCountdown !== null && flashCountdown > 0) {
@@ -137,24 +212,35 @@ export default function App() {
     }
   }, [flashCountdown]);
 
-  // --- CARGA Y REALTIME DE HARDWARE (TACTICAL GRID) ---
+  // --- CARGA Y REALTIME DE HARDWARE ---
+  const fetchDevices = async () => {
+    if (!establishmentId) return;
+    const { data, error } = await supabase
+      .from('devices')
+      .select('*')
+      .eq('establishment_id', establishmentId);
+      
+    if (error) {
+      console.error("❌ Error actualizando nodos en grid:", error.message);
+    } else if (data) {
+      const mappedTables: TableData[] = data.map((d: any) => ({
+        id: d.id,
+        name: d.name,
+        status: d.status,
+        staffId: d.assigned_staff_id || d.current_staff_id || null,
+        grid_x: d.grid_x || 0,
+        grid_y: d.grid_y || 0,
+        establishment_id: d.establishment_id,
+        assigned_element_id: d.assigned_element_id || null
+      }));
+      setTables(mappedTables); 
+    }
+  };
+
   useEffect(() => {
     if (!establishmentId) return;
     
-    const fetchUnits = async () => {
-      const { data, error } = await supabase
-        .from('devices')
-        .select('*')
-        .eq('establishment_id', establishmentId);
-        
-      if (error) {
-        console.error("❌ Error actualizando nodos en grid:", error.message);
-      } else if (data) {
-        setTables(data); 
-      }
-    };
-
-    fetchUnits();
+    fetchDevices();
 
     const channel = supabase
       .channel('grid-updates')
@@ -163,30 +249,86 @@ export default function App() {
         schema: 'public', 
         table: 'devices', 
         filter: `establishment_id=eq.${establishmentId}` 
-      }, () => fetchUnits())
+      }, () => fetchDevices())
       .subscribe();
 
     return () => { channel.unsubscribe(); };
   }, [establishmentId]);
 
-  // --- OPERACIONES DE NODOS LOCALES ---
-  const handleAddTable = () => {
-    const newId = `TBL-${String(tables.length + 1).padStart(2, '0')}`;
-    const newTable: TableData = { id: newId, name: `T${String(tables.length + 1).padStart(2, '0')}`, status: 'offline', staffId: null, lastPing: Date.now() };
-    setTables(prev => [...prev, newTable]);
+  // --- OPERACIONES DE AP-UNITS EN SUPABASE ---
+  const handleAddTable = async () => {
+    if (!establishmentId) return;
+
+    try {
+      const { data: staffData } = await supabase
+        .from('staff')
+        .select('id')
+        .eq('establishment_id', establishmentId)
+        .limit(1)
+        .maybeSingle();
+
+      const activeStaffId = staffData?.id || null;
+      const nextNum = String(tables.length + 1).padStart(2, '0');
+      
+      const { error: insertError } = await supabase
+        .from('devices')
+        .insert([
+          {
+            name: `AP-UNIT-${nextNum}`,
+            status: 'offline',
+            establishment_id: establishmentId,
+            grid_x: 10, 
+            grid_y: 10,
+            current_recipe: {},
+            is_mirroring_active: false,
+            current_staff_id: activeStaffId,
+            assigned_staff_id: activeStaffId,
+            assigned_element_id: null 
+          }
+        ]);
+
+      if (insertError) {
+        console.error("❌ Error en inserción de AP-Unit:", insertError.message);
+      } else {
+        fetchDevices();
+      }
+
+    } catch (err) {
+      console.error("⚠️ Excepción detectada en Aura OS:", err);
+    }
   };
 
   const handleRemoveTable = (id: string) => { setTableToDelete(id); };
 
-  const confirmRemoveTable = () => {
+  const confirmRemoveTable = async () => {
     if (!tableToDelete) return;
-    setTables(prev => prev.filter(t => t.id !== tableToDelete));
-    if (selectedTableId === tableToDelete) setSelectedTableId(null);
-    setTableToDelete(null);
+    
+    const { error } = await supabase
+      .from('devices')
+      .delete()
+      .eq('id', tableToDelete);
+
+    if (error) {
+      console.error("❌ Error al eliminar el nodo de Supabase:", error.message);
+    } else {
+      setTables(prev => prev.filter(t => t.id !== tableToDelete));
+      if (selectedTableId === tableToDelete) setSelectedTableId(null);
+      setTableToDelete(null);
+      fetchDevices();
+    }
   };
 
-  const handleRenameTable = (id: string, newName: string) => {
-    setTables(prev => prev.map(t => t.id === id ? { ...t, name: newName } : t));
+  const handleRenameTable = async (id: string, newName: string) => {
+    const { error } = await supabase
+      .from('devices')
+      .update({ name: newName })
+      .eq('id', id);
+
+    if (error) {
+      console.error("❌ Error al renombrar en Supabase:", error.message);
+    } else {
+      setTables(prev => prev.map(t => t.id === id ? { ...t, name: newName } : t));
+    }
   };
 
   if (loading) return <div className="h-screen bg-black flex items-center justify-center text-aura-cyan animate-pulse tracking-[1em] font-mono text-xs uppercase italic">Aura_OS_Booting...</div>;
@@ -195,7 +337,7 @@ export default function App() {
   return (
     <div className="min-h-screen h-screen bg-aura-panel text-aura-green font-mono flex flex-col overflow-hidden p-[18px] border-4 border-aura-dark select-none text-[13px] relative">
       
-      {/* --- CORE CONTROL HEADER --- */}
+      {/* HEADER */}
       <header className="flex justify-between items-center border-b-2 border-aura-green/30 pb-4 mb-[18px] shrink-0 z-10">
         <div className="flex items-center gap-[26px]">
           <div className="flex items-center gap-4">
@@ -239,7 +381,7 @@ export default function App() {
         </button>
       </header>
 
-      {/* --- DASHBOARD WRAPPER --- */}
+      {/* DASHBOARD WRAPPER */}
       <div className="flex flex-1 overflow-hidden gap-[18px]">
         
         {/* SIDEBAR NAVIGATION */}
@@ -296,12 +438,19 @@ export default function App() {
         </aside>
 
         {/* WORKSPACE AREA */}
-        <main className="flex-1 bg-aura-panel border-2 border-aura-dark p-[18px] relative overflow-hidden flex flex-col font-mono text-[13px]">
+        <main className="flex-1 min-w-0 bg-aura-panel border-2 border-aura-dark p-[18px] relative overflow-hidden flex flex-col font-mono text-[13px]">
           <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
             <AnimatePresence mode="wait">
               {activeTab === 'grid' && (
-                <motion.div key="grid" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="w-full h-full p-[26px] overflow-y-auto">
-                  <TacticalGrid tables={tables} staffList={staffList} onTableSelect={(id:string) => setSelectedTableId(id)} onAddTable={handleAddTable} onRemoveTable={handleRemoveTable} />
+                <motion.div key="grid" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="w-full h-full p-[2px] overflow-hidden">
+                  <TacticalGrid 
+                    tables={tables} 
+                    staffList={staffList} 
+                    onTableSelect={(id:string | null) => setSelectedTableId(id)} 
+                    fetchDevices={fetchDevices}
+                    establishmentId={establishmentId}
+                    selectedTableId={selectedTableId}
+                  />
                 </motion.div>
               )}
               {activeTab === 'lab' && (
@@ -320,7 +469,6 @@ export default function App() {
                   {userRole === 'superadmin' ? (
                     <AuraCentral />
                   ) : (
-                    /* TERMINAL DE ACCESO DENEGADO */
                     <div className="h-full flex flex-col items-center justify-center font-mono text-center space-y-4 border-2 border-aura-red/30 bg-aura-red/5 p-8 rounded-lg">
                       <div className="w-3 h-3 bg-aura-red rounded-full animate-ping shadow-[0_0_10px_#ff003c]" />
                       <h2 className="text-2xl font-black text-aura-red uppercase tracking-widest">CRITICAL_SECURITY_BREACH</h2>
@@ -348,6 +496,7 @@ export default function App() {
                   onClose={() => setSelectedTableId(null)} 
                   onRename={(name:string) => { if (selectedTableId) handleRenameTable(selectedTableId, name); }}
                   onToggleAdmin={(id:string, isCurrentlyAdmin:boolean) => { setTables(prev => prev.map(t => t.id === id ? { ...t, status: isCurrentlyAdmin ? 'online' : 'admin' } : t)); }}
+                  liveTelemetry={liveTelemetry}
                 />
               </>
             )}
@@ -358,7 +507,7 @@ export default function App() {
         <EventHorizon events={systemEvents} onSelectUnit={(id:string) => { setActiveTab('grid'); setSelectedTableId(id); }} activeNodesCount={tables.filter(t => t.status !== 'offline').length} totalNodesCount={tables.length} />
       </div>
       
-      {/* 👇 VENTANA FLOTANTE "POR APARTE" DE ENDPOINTS CON ANIMACIÓN TÁCTICA 👇 */}
+      {/* VENTANA FLOTANTE DE ENDPOINTS */}
       <AnimatePresence>
         {userRole === 'superadmin' && showTerminal && (
           <motion.div 
@@ -367,7 +516,6 @@ export default function App() {
             exit={{ opacity: 0, y: 50, scale: 0.95 }}
             className="fixed top-[100px] right-[420px] bottom-[80px] w-[650px] bg-zinc-950/95 backdrop-blur-md border-2 border-aura-cyan shadow-[0_0_50px_rgba(0,243,255,0.2)] z-50 flex flex-col p-2"
           >
-            {/* BARRA DE TÍTULO DE LA VENTANA */}
             <div className="flex justify-between items-center bg-zinc-900 px-3 py-1.5 border-b border-aura-cyan/30 text-[11px] font-bold text-aura-cyan">
               <span className="flex items-center gap-2"><Terminal size={12}/> [SYS_UPLINK_CONSOLE] // ISOLATED_MODE</span>
               <button 
@@ -377,7 +525,6 @@ export default function App() {
                 [X]
               </button>
             </div>
-            {/* CONTENIDO INTERNO CON SCROLL PROPIO */}
             <div className="flex-1 overflow-y-auto p-2">
               <Endpoints />
             </div>
@@ -385,13 +532,12 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* SYSTEM SYSTEM FOOTER */}
+      {/* SYSTEM FOOTER */}
       <footer className="mt-[18px] pt-2 border-t border-aura-dark flex justify-between items-center text-[11px] opacity-60 shrink-0 font-mono tracking-widest uppercase">
         <div className="flex gap-[26px] items-center">
           <span>DB: CONNECTED</span>
-          <span className="text-aura-cyan">Uplink: {organizationId?.slice(0, 8)}...</span>
+          <span className="text-aura-cyan">Uplink: {establishmentId?.slice(0, 8)}...</span>
           
-          {/* 👇 BOTÓN DE ACCESO RÁPIDO PARA ACTIVAR LA VENTANA FLOTANTE 👇 */}
           {userRole === 'superadmin' && (
             <button
               onClick={() => setShowTerminal(!showTerminal)}
@@ -426,11 +572,15 @@ function NavButton({ active, onClick, icon, label, collapsed, customClass }: any
   );
 }
 
-function LiveMirrorDrawer({ table, staff, onClose, onRename }: any) {
+/* --- LIVEMIRRORDRAWER --- */
+function LiveMirrorDrawer({ table, staff, onClose, onRename, liveTelemetry }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   
-  useEffect(() => { if (table && !isEditing) setEditName(table.name); }, [table?.name, isEditing]);
+  useEffect(() => { 
+    if (table && !isEditing) setEditName(table.name); 
+  }, [table?.name, isEditing]);
+
   if (!table) return null;
 
   const submitEdit = () => {
@@ -438,24 +588,111 @@ function LiveMirrorDrawer({ table, staff, onClose, onRename }: any) {
     if (editName.trim() !== '' && editName !== table.name) onRename(editName.trim().toUpperCase());
   };
 
+  // 📡 SEÑAL DE ACTIVACIÓN CORREGIDA: Cambia el estado dual y lanza de forma remota 
+  // la pestaña del simulador en una ventana independiente, esquivando el error 404.
+  const handlePlayCommand = async () => {
+    console.log(`📡 Despachando comando de transmisión remota al nodo: ${table.id}`);
+    
+    // 1. Forzamos la apertura de la ventana simuladora apuntando a la raíz con queries limpios
+    const targetUrl = `${window.location.origin}/?mode=apunit&id=${table.id}`;
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+
+    // 2. Propagamos el cambio de estado a la base de datos para encender el motor síncrono
+    await supabase
+      .from('devices')
+      .update({ 
+        status: 'running',
+        is_mirroring_active: true,
+        last_heartbeat: new Date().toISOString()
+      })
+      .eq('id', table.id);
+  };
+
+    {/* PEQUEÑA BARRA DE DIAGNÓSTICO ELÉCTRICO (CORREGIDA) */}
+        {liveTelemetry && (
+          <div className="mt-2 text-[10px] flex justify-between uppercase tracking-widest px-1 font-bold">
+            <span className={liveTelemetry.sys_volt < 5.0 ? 'text-aura-red animate-pulse' : 'text-aura-cyan'}>
+              VOLT: {liveTelemetry.sys_volt || '0.00'}V
+            </span>
+            <span className={liveTelemetry.cpu_temp > 45 ? 'text-aura-red animate-pulse' : 'text-aura-cyan'}>
+              TEMP: {liveTelemetry.cpu_temp || '00.0'}°C
+            </span>
+            <span className="text-aura-green">
+              FPS: {liveTelemetry.fps || '00.0'}
+            </span>
+          </div>
+        )} 
+
   return (
     <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: "spring", stiffness: 300, damping: 30 }} className="absolute top-0 right-0 bottom-0 w-[400px] border-l border-aura-green/30 bg-aura-bg/95 backdrop-blur-xl shadow-[-10px_0_30px_rgba(0,0,0,0.8)] z-50 flex flex-col font-mono text-[13px]">
+      
+      {/* HEADER */}
       <div className="flex items-center justify-between p-[18px] border-b border-aura-green/20">
-        <div className="flex items-center gap-[14px] text-aura-green"><Maximize2 size={18} /><h3 className="font-bold uppercase tracking-widest text-[14px]">Live Mirroring</h3></div>
+        <div className="flex items-center gap-[14px] text-aura-green">
+          <Maximize2 size={18} />
+          <h3 className="font-bold uppercase tracking-widest text-[14px]">Live Mirroring</h3>
+        </div>
         <button onClick={onClose} className="text-aura-green/50 hover:text-aura-green transition-colors"><X size={20} /></button>
       </div>
+
+      {/* CUERPO */}
       <div className="p-[26px] flex-1 flex flex-col overflow-y-auto">
         <div className="flex items-start justify-between mb-6 gap-4">
           <div className="flex-1 min-w-0">
             <div className="text-[33px] font-black tracking-widest text-aura-green mb-1 flex items-center gap-[14px]">
-              {isEditing ? <input autoFocus value={editName} onChange={e => setEditName(e.target.value)} onBlur={submitEdit} className="bg-transparent border-b border-aura-cyan text-aura-text outline-none w-48" /> : <span className="truncate flex items-center gap-4">{table.name} <button onClick={() => setIsEditing(true)}><Pencil size={18} className="opacity-30"/></button></span>}
+              {isEditing ? (
+                <input autoFocus value={editName} onChange={e => setEditName(e.target.value)} onBlur={submitEdit} className="bg-transparent border-b border-aura-cyan text-aura-text outline-none w-48" />
+              ) : (
+                <span className="truncate flex items-center gap-4">{table.name} <button onClick={() => setIsEditing(true)}><Pencil size={18} className="opacity-30"/></button></span>
+              )}
             </div>
-            <p className="text-[10px] uppercase opacity-40 font-bold">{table.id} // STAFF: {staff?.name || 'NONE'}</p>
+            <p className="text-[10px] uppercase opacity-40 font-bold tracking-wider">
+              {table.id} // STAFF: {staff?.name || 'NONE'}
+            </p>
+            
+            {/* TEXTO DINÁMICO DE ESTADOS DE LA PI ZERO 2W */}
+            <div className="text-[9px] uppercase font-bold text-aura-cyan mt-1.5 flex gap-3 opacity-60">
+              <span>Modo: {liveTelemetry?.mode || 'SYSTEM_OS'}</span>
+              <span className={liveTelemetry?.state === 'ERROR' ? 'text-aura-red' : 'text-aura-green'}>
+                ● [{liveTelemetry?.state || 'STANDBY'}]
+              </span>
+            </div>
           </div>
         </div>
-        <div className="w-full aspect-video border-2 border-aura-green/50 bg-aura-black flex items-center justify-center">
-          <Play className="text-aura-green/30" size={40} />
+
+        {/* CONTENEDOR CON BOTÓN ACTIVO */}
+        <div className="w-full aspect-video border-2 border-aura-green/50 bg-aura-black flex flex-col items-center justify-center gap-2 relative group">
+          
+          <button 
+            onClick={handlePlayCommand}
+            className="p-3 rounded-full bg-aura-green/5 border border-aura-green/30 text-aura-green/40 hover:text-aura-green hover:bg-aura-green/10 hover:border-aura-green transition-all duration-300 cursor-pointer shadow-[0_0_15px_rgba(0,255,102,0.05)] active:scale-95 z-10"
+            title="Lanzar transmisión interactiva"
+          >
+            <Play className="transition-transform group-hover:scale-110" size={28} />
+          </button>
+          
+          {/* Subtítulo dinámico para ver qué app está activa en la Pi */}
+          {liveTelemetry?.current_item && (
+            <span className="text-[9px] text-aura-text/40 uppercase tracking-tight absolute bottom-2 font-mono">
+              App: {liveTelemetry.current_item}
+            </span>
+          )}
         </div>
+        
+        {/* PEQUEÑA BARRA DE DIAGNÓSTICO ELÉCTRICO (CORREGIDA) */}
+        {liveTelemetry && (
+          <div className="mt-2 text-[10px] flex justify-between uppercase tracking-widest px-1 font-bold">
+            <span className={liveTelemetry.sys_volt < 5.0 ? 'text-aura-red animate-pulse' : 'text-aura-cyan'}>
+              VOLT: {liveTelemetry.sys_volt || '0.00'}V
+            </span>
+            <span className={liveTelemetry.cpu_temp > 45 ? 'text-aura-red animate-pulse' : 'text-aura-cyan'}>
+              TEMP: {liveTelemetry.cpu_temp || '00.0'}°C
+            </span>
+            <span className="text-aura-green">
+              FPS: {liveTelemetry.fps || '00.0'}
+            </span>
+          </div>
+        )}
       </div>
     </motion.div>
   );
