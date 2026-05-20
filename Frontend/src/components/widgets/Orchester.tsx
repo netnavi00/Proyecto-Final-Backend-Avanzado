@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion } from 'motion/react';
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { AlertTriangle, Activity, RefreshCw } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 
@@ -11,23 +11,65 @@ export function Orchester({ tables, winningRatio, setWinningRatio, onFlashAction
   const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
   const [slides, setSlides] = useState<string[]>(['', '', '', '']);
 
+  // 🚀 ESTADOS PARA EL SELECTOR DE CAMPAÑAS
+  const [savedCampaigns, setSavedCampaigns] = useState<any[]>([]);
+  const [selectedCampaignId, setSelectedCampaignId] = useState('');
+
+  // 🚀 CARGAMOS LAS CAMPAÑAS AL INICIAR
+  useEffect(() => {
+    fetchCampaigns();
+  }, []);
+
+  const fetchCampaigns = async () => {
+    const { data, error } = await supabase
+      .from('promo_scripts')
+      .select('id, name, config_payload')
+      .order('created_at', { ascending: false });
+    
+    if (!error && data) {
+      setSavedCampaigns(data);
+    }
+  };
+
   const handleGlobalPush = async () => {
+    // 1. Validación de campaña
+    if (!selectedCampaignId) {
+      alert('⚠️ Selecciona una campaña del Creative Lab antes de hacer el Push.');
+      return;
+    }
+
+    const campaign = savedCampaigns.find(c => String(c.id) === String(selectedCampaignId));
+    if (!campaign) return;
+
     setIsPushing(true);
     setPulseActive(true);
     
-    // Simulate Supabase deployment
     try {
-      // Direct logic with supabase-js
-      await supabase.from('units').update({ 
-        action: 'global_pulse',
-        aura_color: auraColor !== 'Auto' ? auraColor : null,
+      // 2. Determinamos color y targets
+      const deployedColor = auraColor === 'Auto' ? '#00ff66' : auraColors.find(c => c.name === auraColor)?.hex || '#00ff66';
+      const targetIds = targetType === 'All' ? tables?.map((t:any) => t.id) || [] : selectedUnits;
+
+      if (targetIds.length === 0) {
+        alert("No hay unidades (devices) seleccionadas o disponibles.");
+        setIsPushing(false);
+        setPulseActive(false);
+        return;
+      }
+
+      // 3. Mutación SCADA en 'devices' (Inyecta el JSON de diseño y manda a 'running')
+      const { error } = await supabase.from('devices').update({ 
+        status: 'running',
+        aura_color: deployedColor,
+        current_recipe: campaign.config_payload,
         updated_at: new Date().toISOString()
-      }).in('id', targetType === 'All' ? tables.map((t:any) => t.id) : selectedUnits);
+      }).in('id', targetIds);
       
-      alert('Global Push deployed successfully across AP-Units');
-    } catch (e) {
+      if (error) throw error;
+      
+      alert(`🚀 Campaña "${campaign.name}" inyectada exitosamente en las AP-Units seleccionadas.`);
+    } catch (e: any) {
       console.error(e);
-      alert('Failed to push to Supabase');
+      alert('Failed to push to Supabase: ' + e.message);
     } finally {
       setIsPushing(false);
       setTimeout(() => setPulseActive(false), 2000);
@@ -36,8 +78,11 @@ export function Orchester({ tables, winningRatio, setWinningRatio, onFlashAction
 
   const handleSyncContent = async () => {
     try {
+      const activeSlides = slides.filter(s => s.trim() !== '');
+      if (activeSlides.length === 0) return;
+
       await supabase.from('publicity_slides').insert(
-        slides.filter(s => s).map((url, i) => ({ url, order: i }))
+        activeSlides.map((url, i) => ({ url, order: i }))
       );
       alert('Content Deployment Synced to Network');
     } catch (error) {
@@ -46,7 +91,7 @@ export function Orchester({ tables, winningRatio, setWinningRatio, onFlashAction
   };
 
   const auraColors = [
-    { name: 'Auto', hex: '#555555' },
+    { name: 'Auto', hex: '#00ff66' },
     { name: 'Cyan', hex: '#00e5ff' },
     { name: 'Green', hex: 'var(--color-aura-green)' },
     { name: 'Red', hex: '#ff003c' },
@@ -86,7 +131,7 @@ export function Orchester({ tables, winningRatio, setWinningRatio, onFlashAction
             
             {(targetType === 'Zone' || targetType === 'Individual') && (
                <div className="mt-[14px] grid grid-cols-4 gap-[9px] max-h-32 overflow-y-auto">
-                 {tables.map((t:any) => (
+                 {tables?.map((t:any) => (
                    <button 
                      key={t.id}
                      onClick={() => setSelectedUnits(prev => prev.includes(t.id) ? prev.filter(id => id !== t.id) : [...prev, t.id])}
@@ -103,6 +148,21 @@ export function Orchester({ tables, winningRatio, setWinningRatio, onFlashAction
                   <span>Command will be broadcasted to all active units on the network.</span>
                </div>
             )}
+          </div>
+
+          {/* 🚀 NUEVO: Selector de Campaña Integrado Visualmente */}
+          <div className="bg-aura-inner border-2 border-aura-cyan/30 p-[18px] shadow-[0_0_15px_rgba(0,229,255,0.05)]">
+            <h3 className="text-[12px] uppercase text-aura-cyan font-bold tracking-widest mb-[14px]">Script Promocional</h3>
+            <select 
+              value={selectedCampaignId}
+              onChange={(e) => setSelectedCampaignId(e.target.value)}
+              className="bg-aura-bg border-2 border-aura-dark text-[13px] p-[9px] text-aura-text outline-none focus:border-aura-cyan uppercase w-full cursor-pointer"
+            >
+              <option value="">-- SELECCIONAR CAMPAÑA GUARDADA --</option>
+              {savedCampaigns.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
           </div>
 
           {/* Gamification Tuning */}
