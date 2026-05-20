@@ -203,6 +203,7 @@ Corre ambos archivos en temrinales distintas, primero server.js para habilitar l
 <img width="1146" height="163" alt="image" src="https://github.com/user-attachments/assets/60cea063-364f-4eaa-ae4b-1e0f0e4c7d56" />
 
 y despues el test-ping.js
+<img width="990" height="368" alt="image" src="https://github.com/user-attachments/assets/1609ef6d-a8f9-4f2c-8ffb-ad8bd5ed6d40" />
 
 
 
