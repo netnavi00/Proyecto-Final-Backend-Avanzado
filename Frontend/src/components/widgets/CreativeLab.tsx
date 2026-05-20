@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect,useRef } from 'react';
 import { AlertTriangle, UploadCloud, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 
@@ -63,6 +63,7 @@ export const DESIGN_PRESETS: Record<string, Partial<SlotConfig>> = {
 export interface SlotConfig {
   boundItemId: string | null;
   customText: string | null;
+  imageUrl?: string | null;
   customTextSize: number;
   fontFamily: string;
   rotation: number;
@@ -155,6 +156,10 @@ export function CreativeLab() {
     { id: 3, layout: 'focus', slots: { 'slot-0': { ...DEFAULT_SLOT }, 'slot-1': { ...DEFAULT_SLOT }, 'slot-2': { ...DEFAULT_SLOT } } },
     { id: 4, layout: 'full', slots: { 'slot-0': { ...DEFAULT_SLOT } } }
   ]);
+  const [currentEstablishmentId, setCurrentEstablishmentId] = useState<string>('');
+  const [isDropdownMenuOpen, setIsDropdownMenuOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   const [selectedPageId, setSelectedPageId] = useState(1);
   const [selectedSlotId, setSelectedSlotId] = useState<string>('slot-0');
   const [gridMode, setGridMode] = useState(false);
@@ -163,6 +168,7 @@ export function CreativeLab() {
   const [campaignName, setCampaignName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [savedCampaigns, setSavedCampaigns] = useState<any[]>([]);
+ 
 
   // 🚀 ESTADOS PARA LOS ACORDEONES DEL MENÚ IZQUIERDO
   const [isLibraryOpen, setIsLibraryOpen] = useState(true);
@@ -170,6 +176,42 @@ export function CreativeLab() {
 
   const activePage = pages.find(p => p.id === selectedPageId)!;
   const activeSlot = activePage.slots[selectedSlotId];
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // Si el ref existe y el elemento clickeado NO está dentro del menú
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownMenuOpen(false);
+      }
+    };
+
+    // Escuchamos los clics en todo el documento
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    // Limpieza del evento cuando se desmonta el componente
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    const fetchSession = async () => {
+      // Obtenemos el usuario que tiene la sesión iniciada
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (user) {
+        setCurrentEstablishmentId(user.id);
+      } else {
+        console.warn("⚠️ No hay sesión activa. Los scripts no tendrán un establishment_id.");
+        // Si estás haciendo pruebas sin iniciar sesión, puedes descomentar la línea de abajo 
+        // y pegar un ID real de tu base de datos temporalmente para que no marque error:
+        // setCurrentEstablishmentId('PEGAR-UN-UUID-DE-TU-BASE-DE-DATOS-AQUI');
+      }
+    };
+
+    fetchSession();
+  }, []);
+
 
   useEffect(() => {
     fetchCampaigns();
@@ -270,74 +312,266 @@ export function CreativeLab() {
     }
   };
 
-  const exportRecipe = async () => {
-    if (!campaignName.trim()) {
-      alert("⚠️ ALERTA: Por favor, asígnale un nombre a la campaña antes de guardarla.");
+  const exportRecipe = async (currentEstablishmentId: string) => {
+    const MAX_RECIPES = 5; 
+
+    if (!currentEstablishmentId) {
+      alert("🛑 ERROR: No se detectó un ID de establecimiento válido.");
       return;
     }
 
+    const normalizedName = campaignName.trim().toUpperCase();
+
+    if (!normalizedName) {
+      alert("⚠️ ALERTA: Por favor, asígnale un nombre a la campaña.");
+      return;
+    }
+
+    // ==========================================
+    // 🛡️ MOTOR DE VALIDACIÓN DE INTEGRIDAD V2
+    // ==========================================
+    const emptyPages: number[] = [];
+    const incompletePages: number[] = [];
+    const pagesWithWarnings: number[] = [];
+    const validPages: typeof pages = [];
+
+    pages.forEach((page) => {
+      let requiredKeys: string[] = [];
+      if (page.layout === 'full') requiredKeys = ['slot-0'];
+      else if (page.layout === 'split') requiredKeys = ['slot-0', 'slot-1'];
+      else if (page.layout === 'focus') requiredKeys = ['slot-0', 'slot-1', 'slot-2'];
+
+      let emptyCount = 0;
+      let hasPartialSlot = false;
+
+      requiredKeys.forEach(key => {
+        const slot = page.slots[key];
+        
+        // Evaluamos qué contiene el slot exactamente
+        const hasCatalogItem = !!(slot && slot.boundItemId);
+        const hasCustomImage = !!(slot && slot.imageUrl);
+        const hasCustomText = !!(slot && slot.customText);
+
+        if (!hasCatalogItem && !hasCustomImage && !hasCustomText) {
+          // El slot está 100% muerto
+          emptyCount++;
+        } else {
+          // El slot tiene contenido. Evaluamos si es "parcial" (solo texto o solo imagen sin ítem del catálogo)
+          if (!hasCatalogItem && ((hasCustomImage && !hasCustomText) || (hasCustomText && !hasCustomImage))) {
+            hasPartialSlot = true;
+          }
+        }
+      });
+
+      if (emptyCount === requiredKeys.length) {
+        emptyPages.push(page.id); // No hay nada en toda la página
+      } else if (emptyCount > 0) {
+        incompletePages.push(page.id); // La página tiene huecos reales
+      } else {
+        validPages.push(page); // La página tiene todos los slots ocupados
+        if (hasPartialSlot) {
+          pagesWithWarnings.push(page.id); // Pero detectamos algo que requiere advertencia suave
+        }
+      }
+    });
+
+    // 🛑 1. BLOQUEO ESTRICTO: Páginas a medias (Espacios 100% en blanco)
+    if (incompletePages.length > 0) {
+      alert(`🛑 ERROR VISUAL: La(s) página(s) [ ${incompletePages.join(', ')} ] tienen HUECOS VACÍOS.\n\nEl sistema no permite guardar layouts rotos. Llena todos los espacios o cambia el tipo de Layout.`);
+      return; 
+    }
+
+    // 🧹 2. AUTO-LIMPIEZA: Páginas totalmente vacías
+    if (emptyPages.length > 0) {
+      const confirmClean = window.confirm(`⚠️ ANOMALÍA: La(s) página(s) [ ${emptyPages.join(', ')} ] están completamente vacías.\n\n¿Purgar páginas en blanco y continuar guardando el resto?`);
+      if (!confirmClean) return; 
+    }
+
+    // Si después de limpiar no quedó nada...
+    if (validPages.length === 0) {
+      alert("🛑 ERROR: No hay páginas con contenido válido para guardar. Abortando.");
+      return;
+    }
+
+    // ⚠️ 3. ADVERTENCIA SUAVE: Slots con solo texto o solo imagen
+    if (pagesWithWarnings.length > 0) {
+      const confirmPartial = window.confirm(`👁️ REVISIÓN RECOMENDADA: La(s) página(s) [ ${pagesWithWarnings.join(', ')} ] contienen slots que tienen SOLO texto o SOLO una imagen.\n\nSi es intencional (ej. una imagen que ya trae texto o un mensaje sorpresa), presiona 'Aceptar' para guardar.`);
+      if (!confirmPartial) return; // El usuario prefiere regresar a ponerle texto o imagen
+    }
+    // ==========================================
+
+    const existingCampaign = savedCampaigns.find(
+      c => String(c.name).trim().toUpperCase() === normalizedName
+    );
+
+    if (!existingCampaign && savedCampaigns.length >= MAX_RECIPES) {
+      alert(`🛑 LÍMITE ALCANZADO: Tienes ${savedCampaigns.length}/${MAX_RECIPES} scripts almacenados.`);
+      return;
+    }
+
+    if (existingCampaign) {
+      const confirmOverwrite = window.confirm(
+        `⚠️ ADVERTENCIA: Ya existe un script llamado "${normalizedName}".\n¿Sobreescribir memoria existente?`
+      );
+      if (!confirmOverwrite) return; 
+    }
+
     setIsSaving(true);
+    
+    // 📦 EMPAQUETADO FINAL: Enviamos las páginas purificadas (validPages)
     const payload = { 
-      pages: pages,
+      pages: validPages, 
       catalog: catalog 
     };
 
-    const { data, error } = await supabase
-      .from('promo_scripts')
-      .insert({
-        name: campaignName,
-        config_payload: payload,
-        slot: 1 
-      });
+    try {
+      if (existingCampaign) {
+        const { error } = await supabase
+          .from('promo_scripts')
+          .update({ config_payload: payload, name: normalizedName })
+          .eq('id', existingCampaign.id)
+          .eq('establishment_id', currentEstablishmentId); 
+          
+        if (error) throw error;
+        alert(`🔄 Receta "${normalizedName}" actualizada en el SYS.STORAGE.`);
+      } else {
+        const { error } = await supabase
+          .from('promo_scripts')
+          .insert({
+            name: normalizedName,
+            config_payload: payload,
+            slot: 1,
+            establishment_id: currentEstablishmentId 
+          });
+          
+        if (error) throw error;
+        alert(`✅ Nueva receta "${normalizedName}" inyectada en memoria.`);
+      }
 
-    setIsSaving(false);
-
-    if (error) {
-      alert("Fallo en la conexión: " + error.message);
-    } else {
-      alert(`Campaña "${campaignName}" guardada en la biblioteca exitosamente.`);
       setCampaignName(''); 
       fetchCampaigns(); 
+    } catch (error: any) {
+      console.error(error);
+      alert("Fallo al guardar en la base de datos: " + error.message);
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  return (
+const deleteRecipe = async (recipeId: string, recipeName: string, currentEstablishmentId: string) => {
+    if (!currentEstablishmentId) {
+      alert("🛑 ERROR: No se detectó un ID de establecimiento válido.");
+      return;
+    }
+
+    // Un prompt de confirmación rápido para evitar botonazos por error
+    const confirmDelete = window.confirm(`⚠️ ¿Estás seguro de que deseas ELIMINAR permanentemente la campaña "${recipeName}"?`);
+    if (!confirmDelete) return;
+
+    try {
+      // Ejecutamos el borrado físico con doble validación de seguridad
+      const { error } = await supabase
+        .from('promo_scripts')
+        .delete()
+        .eq('id', recipeId)
+        .eq('establishment_id', currentEstablishmentId);
+
+      if (error) throw error;
+
+      alert(`🗑️ Campaña "${recipeName}" eliminada correctamente.`);
+      
+      // Si la receta que borraste estaba seleccionada en el input o pantalla actual, la limpiamos
+      if (campaignName.toUpperCase() === recipeName.toUpperCase()) {
+        setCampaignName('');
+      }
+
+      // Recargamos el estado local y la lista del desplegable
+      fetchCampaigns(); 
+    } catch (error: any) {
+      console.error(error);
+      alert("Fallo al eliminar de la base de datos: " + error.message);
+    }
+  };
+
+ return (
     <div className="h-full flex flex-col">
       {/* 🚀 HEADER MEJORADO */}
-      <div className="flex flex-col gap-[18px] mb-[18px] shrink-0">
-        <h2 className="text-[13px] font-bold mb-[18px] flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-[9px]">
-            <span className="w-1 h-3 bg-aura-cyan"></span>
-            CREATIVE LAB
+      <div className="flex flex-col xl:flex-row items-start xl:items-center w-full shrink-0 gap-6 mb-[24px]">
+        <h2 className="text-[13px] font-bold mb-[18px] flex flex-col xl:flex-row items-center w-full shrink-0 gap-4">
+          
+          {/* 1. TÍTULO IZQUIERDO */}
+          <div className="flex items-center gap-[12px] whitespace-nowrap shrink-0">
+            <span className="w-1.5 h-6 bg-aura-green shadow-[0_0_10px_rgba(0,229,255,0.5)]"></span>
+            <h1 className="text-2xl font-black text-aura-green tracking-widest drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">
+              CREATIVE LAB
+            </h1>
           </div>
           
-          <div className="flex items-center gap-3">
-            {/* 🚀 SELECTOR INSTANTÁNEO (Sin Botón) */}
-            <select 
-              value="" 
-              onChange={(e) => loadCampaign(e.target.value)}
-              className="bg-aura-bg border-2 border-aura-dark text-[12px] px-3 py-1 text-aura-cyan font-bold outline-none focus:border-aura-cyan uppercase w-48 cursor-pointer shadow-[0_0_10px_rgba(0,229,255,0.1)]"
-            >
-              <option value="" disabled>📂 ABRIR GUARDADO...</option>
-              {savedCampaigns.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+          {/* 2. ZONA CENTRAL: CAJA DE ALMACENAMIENTO INDUSTRIAL */}
+          <div className="flex-1 flex justify-end w-full min-w-0 mt-4 xl:mt-0 pr-2">
+            <div className="border-2 border-aura-dark bg-black/40 relative min-w-[200px] max-w-full">
+              
+              {/* Etiqueta Cyberpunk */}
+              <div className="absolute -top-[10px] left-3 bg-black px-2 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 bg-aura-cyan rounded-full animate-pulse shadow-[0_0_5px_rgba(0,229,255,0.8)]"></span>
+                <span className="text-[11px] font-mono text-aura-cyan uppercase tracking-widest font-black">
+                  [ SYS.STORAGE ]
+                </span>
+              </div>
 
-            <span className="text-aura-dark opacity-40 mx-2">|</span>
+              {/* Contenedor de las Recetas (flex-wrap permite bajar a otra fila si se llena) */}
+              <div className="flex flex-wrap items-center gap-[9px] p-3 pt-5">
+                {savedCampaigns.length === 0 ? (
+                  <span className="text-[11px] text-aura-cyan/40 font-mono tracking-widest uppercase opacity-50 ml-2">
+                    [ MEMORIA VACÍA... ]
+                  </span>
+                ) : (
+                  savedCampaigns.map(c => (
+                    <div 
+                      key={c.id} 
+                      className="group flex items-center bg-[#0a0a0a] border border-aura-cyan/40 hover:border-aura-cyan transition-all shrink-0 shadow-[0_0_10px_rgba(0,229,255,0.05)] hover:shadow-[0_0_15px_rgba(0,229,255,0.2)]"
+                    >
+                      {/* Botón para CARGAR */}
+                      <button
+                        onClick={() => loadCampaign(c.id)}
+                        className="px-3 py-1.5 text-[11px] uppercase font-bold text-aura-cyan/80 group-hover:text-aura-cyan transition-colors tracking-wider"
+                        title="Cargar receta al lienzo"
+                      >
+                        {c.name}
+                      </button>
+                      
+                      {/* Botón para BORRAR */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteRecipe(c.id, c.name, currentEstablishmentId);
+                        }}
+                        className="hidden group-hover:flex items-center justify-center border-l border-aura-cyan/40 hover:border-aura-red px-2.5 py-1.5 text-[11px] font-black text-aura-red hover:bg-aura-red/10 transition-colors"
+                        title="Eliminar permanentemente"
+                      >
+                        X
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
 
+          {/* 3. CONTROLES DERECHOS (Input y Guardar) */}
+          <div className="flex items-center gap-3 whitespace-nowrap shrink-0 mt-4 xl:mt-0 self-end xl:self-center">
             <input
               type="text"
               placeholder="NOMBRE NUEVO..."
               value={campaignName}
               onChange={(e) => setCampaignName(e.target.value)}
-              className="bg-aura-bg border-2 border-aura-dark text-[12px] px-3 py-1 text-aura-text outline-none focus:border-aura-cyan uppercase w-40"
+              className="bg-aura-bg border-2 border-aura-dark text-[12px] px-3 py-2 text-aura-text outline-none focus:border-aura-cyan uppercase w-48 shadow-[inset_0_0_10px_rgba(0,0,0,0.5)]"
             />
             <button 
-              onClick={exportRecipe}
+              onClick={() => exportRecipe(currentEstablishmentId)}
               disabled={isSaving}
-              className={`text-[12px] px-3 py-1 uppercase tracking-widest font-bold transition-all ${
-                isSaving ? 'bg-aura-dark text-aura-green/30 cursor-not-allowed' : 'bg-aura-cyan text-black hover:brightness-110 shadow-[0_0_10px_rgba(0,229,255,0.4)]'
+              className={`text-[12px] px-4 py-2 uppercase tracking-widest font-bold transition-all ${
+                isSaving ? 'bg-aura-dark text-aura-cyan/30 cursor-not-allowed' : 'bg-aura-cyan text-black hover:brightness-110 shadow-[0_0_15px_rgba(0,229,255,0.4)]'
               }`}
             >
               {isSaving ? 'GUARDANDO...' : 'GUARDAR'}

@@ -58,7 +58,7 @@ export function Orchester({ tables, winningRatio, setWinningRatio, onFlashAction
 
       // 3. Mutación SCADA en 'devices' (Inyecta el JSON de diseño y manda a 'running')
       const { error } = await supabase.from('devices').update({ 
-        status: 'running',
+        status: 'promo',
         aura_color: deployedColor,
         current_recipe: campaign.config_payload,
         updated_at: new Date().toISOString()

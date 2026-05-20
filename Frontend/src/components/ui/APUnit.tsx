@@ -28,34 +28,51 @@ const HARDWARE_CATALOG = [
 ];
 
 /* --- COMPONENTE RENDERIZADOR DE SLOTS DE HARDWARE --- */
+/* --- COMPONENTE RENDERIZADOR DE SLOTS DE HARDWARE MEJORADO --- */
 function KioskSlotRender({ id, config, catalog }: { id: string, config: any, catalog: any[] }) {
   if (!config) return null;
-  // Busca primero en el catálogo de la receta; si no está, busca en el catálogo base de hardware
-  const item = config.boundItemId ? (catalog.find(i => i.id === config.boundItemId) || HARDWARE_CATALOG.find(i => i.id === config.boundItemId)) : null;
   
+  // 1. Buscamos el ítem en el catálogo (A prueba de errores)
+  const safeCatalog = Array.isArray(catalog) ? catalog : [];
+  const item = config.boundItemId ? (safeCatalog.find(i => i.id === config.boundItemId) || HARDWARE_CATALOG.find(i => i.id === config.boundItemId)) : null;
+  
+  // 2. Lógica de Fallback: Rescata imágenes o textos personalizados aunque no haya ítem
+  const bgImage = item?.imageUrl || config.imageUrl;
+  const displayText = config.customText || item?.name;
+  const displayPrice = item?.type === 'menu' ? item.price : undefined;
+  
+  // 3. Verificamos si hay ALGO que mostrar
+  const hasContent = !!(bgImage || displayText);
+
   return (
     <div className="w-full h-full relative overflow-hidden bg-[#050505] border border-aura-dark/30">
-      {item ? (
+      {hasContent ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div 
-            className="absolute inset-0 bg-cover bg-center mix-blend-screen" 
-            style={{ backgroundImage: `url(${item.imageUrl})`, opacity: config.bgOpacity ?? 0.8 }} 
-          />
+          {/* Fondo (Imagen o Color) */}
+          {bgImage && (
+            <div 
+              className="absolute inset-0 bg-cover bg-center mix-blend-screen transition-all duration-1000" 
+              style={{ backgroundImage: `url(${bgImage})`, opacity: config.bgOpacity ?? 0.8 }} 
+            />
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black opacity-75" />
           
+          {/* Contenedor de Texto y Precio */}
           <div 
-            className="relative z-10 flex flex-col items-center justify-center text-center p-4"
+            className="relative z-10 flex flex-col items-center justify-center text-center p-4 w-full h-full"
             style={{ 
               transform: `rotate(${config.rotation || 0}deg) translate(${config.posX || 0}px, ${config.posY || 0}px)` 
             }}
           >
-             <h3 
-               className={`${config.fontFamily || 'font-mono'} text-white font-black uppercase leading-tight tracking-widest drop-shadow-2xl`}
-               style={{ fontSize: `${config.customTextSize || 24}px` }}
-             >
-               {config.customText || item.name}
-             </h3>
-             {item.type === 'menu' && typeof item.price === 'number' && (
+             {displayText && (
+               <h3 
+                 className={`${config.fontFamily || 'font-mono'} text-white font-black uppercase leading-tight tracking-widest drop-shadow-2xl`}
+                 style={{ fontSize: `${config.customTextSize || 24}px` }}
+               >
+                 {displayText}
+               </h3>
+             )}
+             {displayPrice !== undefined && typeof displayPrice === 'number' && (
                <p 
                  className="font-bold mt-2 tracking-tighter" 
                  style={{ 
@@ -64,11 +81,12 @@ function KioskSlotRender({ id, config, catalog }: { id: string, config: any, cat
                    fontSize: `${(config.customTextSize || 24) * 1.25}px` 
                  }}
                >
-                 ${item.price.toFixed(2)}
+                 ${displayPrice.toFixed(2)}
                </p>
              )}
           </div>
 
+          {/* Etiqueta Promocional */}
           {config.sticker && (
              <div 
                className="absolute top-4 right-4 bg-[#ff003c] text-white uppercase font-black transform rotate-12 shadow-[0_0_15px_rgba(255,0,60,0.6)]"
@@ -82,8 +100,9 @@ function KioskSlotRender({ id, config, catalog }: { id: string, config: any, cat
           )}
         </div>
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center text-[10px] text-neutral-700 uppercase tracking-widest font-bold">
-          EMPTY SLOT [{id}]
+        // Si de verdad está vacío, mostramos un mensaje que SÍ se vea
+        <div className="absolute inset-0 flex items-center justify-center text-[14px] text-aura-cyan/40 uppercase tracking-widest font-bold">
+          [ ESPACIO DISPONIBLE: {id} ]
         </div>
       )}
     </div>
@@ -92,6 +111,7 @@ function KioskSlotRender({ id, config, catalog }: { id: string, config: any, cat
 
 export default function APUnit() {
   const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [deviceName, setDeviceName] = useState<string>('UNIT_UNKNOWN');
   const [status, setStatus] = useState('connecting');
   const [errorMsg, setErrorMsg] = useState('');
   
@@ -101,8 +121,8 @@ export default function APUnit() {
 
   const activeIdRef = useRef<string | null>(null);
   const isStreamingRef = useRef<boolean>(false);
-
-  // 🚀 TIMING ENGINE: Carrusel automático independiente para ciclar páginas
+  
+  // 🚀 TIMING ENGINE: Carrusel automático
   useEffect(() => {
     if (recipePages.length <= 1) return;
     
@@ -113,38 +133,76 @@ export default function APUnit() {
     return () => clearInterval(interval);
   }, [recipePages]);
 
+  // 🛡️ PARSER INDESTRUCTIBLE: Compatible con scripts viejos (Array) y nuevos ({pages, catalog})
+  const parseAndSetRecipe = (rawRecipe: any) => {
+    try {
+      let payload = rawRecipe;
+      if (typeof payload === 'string') payload = JSON.parse(payload);
+      
+      const pagesToLoad = Array.isArray(payload) ? payload : (payload?.pages || []);
+      const catalogToLoad = Array.isArray(payload) ? [] : (payload?.catalog || []);
+
+      if (pagesToLoad && pagesToLoad.length > 0) {
+        setRecipePages(pagesToLoad);
+        setRecipeCatalog(catalogToLoad);
+        setCurrentPageIdx(0);
+      }
+    } catch (e) {
+      console.error("Error procesando payload de receta:", e);
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
     let channel: any = null;
     let telemetryInterval: any = null;
 
+    // 🛰️ FUNCIÓN DE INICIALIZACIÓN COMPLETA Y FILTRADA
     const initializeDevice = async () => {
       const params = new URLSearchParams(window.location.search);
       const currentMode = params.get('mode');
       let currentId = params.get('id');
 
-      if (currentId && currentMode !== 'apunit') {
-        return; 
-      }
+      if (currentId && currentMode !== 'apunit') return; 
 
+      // 🔍 Si entramos por ?mode=apunit sin ID fijo, buscamos dinámicamente
       if (!currentId) {
-        localStorage.removeItem('aura_active_units');
-        const activeTabs = JSON.parse(localStorage.getItem('aura_active_units') || '[]');
+        // 1. Limpiamos y leemos las pestañas activas del navegador
+        const rawStorage = localStorage.getItem('aura_active_units');
+        let activeTabs = [];
+        try { activeTabs = JSON.parse(rawStorage || '[]'); } catch { activeTabs = []; }
 
-        const { data } = await supabase
+        // 2. Buscamos el establecimiento que le pertenece al usuario logueado
+        const { data: sessionData } = await supabase.auth.getSession();
+        let myEstId = null;
+        if (sessionData?.session?.user) {
+           const { data: est } = await supabase
+             .from('establishments')
+             .select('id')
+             .eq('owner_id', sessionData.session.user.id)
+             .single();
+           if (est) myEstId = est.id;
+        }
+
+        // 3. Consultamos las unidades que correspondan a este establecimiento específico
+        let query = supabase
           .from('devices')
-          .select('id')
-          .in('status', ['provisioned', 'offline', 'online', 'running'])
-          .not('id', 'in', `(${activeTabs.join(',') || '00000000-0000-0000-0000-000000000000'})`)
-          .limit(1)
-          .maybeSingle();
+          .select('id, status, current_recipe')
+          .in('status', ['provisioned', 'offline', 'online', 'promo']);
+          
+        if (myEstId) query = query.eq('establishment_id', myEstId);
 
-        if (!data) {
+        const { data: allDevices } = await query;
+        
+        // 4. Encontramos un dispositivo que no esté ya abierto en otra pestaña local
+        const availableDevice = allDevices?.find(d => !activeTabs.includes(d.id));
+
+        if (!availableDevice) {
           if (isMounted) setErrorMsg("NO_HARDWARE_FOUND_IN_DB");
           return;
         }
         
-        currentId = data.id;
+        currentId = availableDevice.id;
         activeTabs.push(currentId);
         localStorage.setItem('aura_active_units', JSON.stringify(activeTabs));
       }
@@ -154,7 +212,7 @@ export default function APUnit() {
       activeIdRef.current = currentId;
       setDeviceId(currentId);
 
-      // Sincronizar estado inicial
+      // Sincronizar estado inicial en la base de datos a ONLINE
       const { data: currentDeviceState, error: updateError } = await supabase
         .from('devices')
         .update({ status: 'online', last_heartbeat: new Date().toISOString() })
@@ -168,10 +226,8 @@ export default function APUnit() {
       } else {
         if (isMounted) {
           const deviceData = currentDeviceState as any;
-          
-          if (deviceData?.current_recipe) {
-            parseAndSetRecipe(deviceData.current_recipe);
-          }
+          if (deviceData?.name) setDeviceName(deviceData.name);
+          if (deviceData?.current_recipe) parseAndSetRecipe(deviceData.current_recipe);
 
           if (deviceData?.status === 'running') {
             isStreamingRef.current = true;
@@ -198,14 +254,13 @@ export default function APUnit() {
             mode: isStreamingRef.current ? 'DIAGNOSTIC' : 'MEDIA_PLAYER',
             state: 'RUNNING',
             current_item: isStreamingRef.current ? 'Streaming Dashboard Telemetry' : 'Rendering Promo Engine',
-            runtime_seconds: Math.floor(Performance.now() / 1000),
+            runtime_seconds: Math.floor(performance.now() / 1000),
             cpu_temp: simulatedTemp,
             sys_volt: simulatedVolt,
             fps: simulatedFps,
             wifi_signal: simulatedRssi,
             components: [{ id: 'sys', type: 'text', label: 'DISPLAY_ENGINE', value: 'ACTIVE' }]
           });
-
       }, 5000);
 
       // 🚀 ESCUCHADOR REALTIME SCADA SIN INTERRUPCIONES
@@ -222,21 +277,8 @@ export default function APUnit() {
             const target = payload?.new;
             
             if (target) {
-              console.log("⚡ Realtime update detectado en Hardware:", target);
-              
               if (target.current_recipe) {
-                // Desempaquetamos el JSONB de inmediato en los estados sin reiniciar el useEffect
-                try {
-                  let payloadData = target.current_recipe;
-                  if (typeof payloadData === 'string') payloadData = JSON.parse(payloadData);
-                  if (payloadData && payloadData.pages) {
-                    setRecipePages(payloadData.pages);
-                    setRecipeCatalog(payloadData.catalog || []);
-                    setCurrentPageIdx(0);
-                  }
-                } catch (err) {
-                  console.error(err);
-                }
+                parseAndSetRecipe(target.current_recipe);
               }
 
               if (target.status === 'running') {
@@ -253,9 +295,10 @@ export default function APUnit() {
       }
     };
 
+    // 🔥 LLAMADA AUTOMÁTICA AL MONTAR EL COMPONENTE
     initializeDevice();
 
-    // 🚀 CLEANUP SEGURO: Solo se ejecuta si la pestaña se cierra o el componente se desmonta de verdad
+    // 🧹 CLEANUP DE SALIDA
     return () => { 
       isMounted = false; 
       if (telemetryInterval) clearInterval(telemetryInterval);
@@ -273,24 +316,9 @@ export default function APUnit() {
             .eq('id', idToShutdown);
         });
       }
-
       if (channel) supabase.removeChannel(channel); 
     };
-  }, []); // 🔒 FIJADO EN APERTURA ÚNICA PARA EVITAR BUCLE DE BORRADO DE DATOS
-
-  const parseAndSetRecipe = (rawRecipe: any) => {
-    try {
-      let payload = rawRecipe;
-      if (typeof payload === 'string') payload = JSON.parse(payload);
-      if (payload && payload.pages) {
-        setRecipePages(payload.pages);
-        setRecipeCatalog(payload.catalog || []);
-        setCurrentPageIdx(0);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
+  }, []); 
 
   if (errorMsg) return <div className="h-screen flex items-center justify-center bg-black p-10 text-red-500 font-mono text-xl">ERROR: {errorMsg}</div>;
   if (!deviceId) return <div className="h-screen flex items-center justify-center bg-black p-10 text-aura-cyan font-mono animate-pulse text-xl">BOOTING_KIOSK_OS...</div>;
@@ -310,14 +338,19 @@ export default function APUnit() {
     );
   }
 
-  // MODO PROMO: SEÑALIZACIÓN DIGITAL INTERACTIVA (AQUÍ SUCEDE EL LIENZO)
+  // MODO PROMO: SEÑALIZACIÓN DIGITAL INTERACTIVA
   if (recipePages.length > 0 && recipePages[currentPageIdx]) {
     const activePage = recipePages[currentPageIdx];
+
+    const safeLayout = activePage.layout || 'full';
+    const safeSlots = activePage.slots || { 'slot-0': activePage };
     
     return (
       <div className="h-screen w-screen bg-black text-white overflow-hidden flex flex-col relative p-4 select-none">
-        <div className="absolute top-1 left-4 text-[9px] font-mono opacity-20 tracking-widest z-50">
-          AURA-NET // RENDERING PROMO_SCRIPT // PAGE {currentPageIdx + 1} OF {recipePages.length}
+        {/* 🚀 ETIQUETA DE TELEMETRÍA VISIBLE */}
+        <div className="absolute top-3 left-4 text-[11px] font-mono text-aura-cyan font-bold tracking-widest z-50 bg-black/60 px-3 py-1.5 border border-aura-cyan/30 shadow-[0_0_10px_rgba(0,0,0,0.8)] backdrop-blur-sm flex items-center gap-2">
+          <span className="w-2 h-2 bg-aura-cyan rounded-full animate-pulse"></span>
+          AURA-NET // {deviceName !== 'UNIT_UNKNOWN' ? deviceName.toUpperCase() : 'AP-UNIT'} [ ID: {deviceId?.split('-')[0]} ] // PAGE {currentPageIdx + 1} OF {recipePages.length}
         </div>
         
         <div className="flex-1 w-full h-full p-2">
