@@ -114,6 +114,26 @@ export default function App() {
     }
   };
   
+  useEffect(() => {
+  const autoConnect = async () => {
+    // 1. Buscamos todas las unidades que están 'online' pero no tienen receta
+    const { data: onlineUnits } = await supabase
+      .from('devices')
+      .select('id')
+      .eq('status', 'online');
+
+    // 2. Si hay unidades listas, les asignamos un estado de "pre-ready"
+    // o simplemente forzamos un ping de sincronización.
+    if (onlineUnits && onlineUnits.length > 0) {
+      console.log("📡 Unidades detectadas, sincronizando...");
+      // Aquí puedes disparar una función que despierte a las unidades
+    }
+  };
+
+  const interval = setInterval(autoConnect, 3000);
+  return () => clearInterval(interval);
+}, []);
+
   // --- MONITOREO DE SESIÓN ACTIVA ---
   useEffect(() => {
     const initializeAuth = async () => {
