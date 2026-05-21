@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Tv, Layers, Plus, Move, LayoutGrid, ZoomIn, ZoomOut, Cpu, Activity, Disc } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { X, Tv, Plus, LayoutGrid, ZoomIn, ZoomOut, Cpu, Activity } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 import type { TableData, StaffData } from '../../App';
 
@@ -65,21 +65,8 @@ export function TacticalGrid({
   // Estado para la telemetría viva del Mirroring
   const [liveTelemetry, setLiveTelemetry] = useState<LiveTelemetry | null>(null);
 
-  // Estado para controlar qué elemento está recibiendo un drag encima (efecto visual de hover al arrastrar)
+  // Estado para controlar qué elemento está recibiendo un drag encima
   const [dragOverElementId, setDragOverElementId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!constraintsRef.current) return;
-
-    // Detecta cuando el contenedor cambia de tamaño (ej. cuando abres/cierras el sidebar)
-    const resizeObserver = new ResizeObserver(() => {
-      // Al ejecutarse, fuerza a las limitantes de Framer Motion a recalcularse sin mover las mesas
-      console.log("📐 Contenedor ajustado por cambio de tamaño en Sidebar");
-    });
-
-    resizeObserver.observe(constraintsRef.current);
-    return () => resizeObserver.disconnect();
-  }, [constraintsRef]);
 
   const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.15, 2));
   const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.15, 0.5));
@@ -91,7 +78,8 @@ export function TacticalGrid({
     const { data, error } = await supabase
       .from('layout_elements')
       .select('*')
-      .eq('establishment_id', establishmentId);
+      .eq('establishment_id', establishmentId)
+      .order('created_at', { ascending: true }); // Mantiene el orden de creación en el grid
     
     if (!error && data) {
       setLayoutElements(data);
@@ -112,7 +100,7 @@ export function TacticalGrid({
     return () => { supabase.removeChannel(channel); };
   }, [establishmentId]);
 
-  // 🚀 REALTIME: Suscripción al nuevo canal de telemetría de alta frecuencia aislado de devices
+  // 🚀 REALTIME: Suscripción al nuevo canal de telemetría
   useEffect(() => {
     if (!selectedTableId) {
       setLiveTelemetry(null);
@@ -139,15 +127,6 @@ export function TacticalGrid({
             wifi_signal: data.wifi_signal
           },
           components: data.components || []
-        });
-      } else {
-        setLiveTelemetry({
-          mode: 'SYSTEM_OS',
-          state: 'STANDBY',
-          current_item: 'Aura Play Interactive Mode',
-          runtime_seconds: 0,
-          hardware: { cpu_temp: 45, sys_volt: 5.1, fps: 60, wifi_signal: 100 },
-          components: []
         });
       }
     };
@@ -184,7 +163,7 @@ export function TacticalGrid({
     return () => { supabase.removeChannel(telemetryChannel); };
   }, [selectedTableId]);
 
-  // Agregar mueble arquitectónico
+  // Agregar mueble arquitectónico (Ahora se apilará automáticamente en el Grid)
   const handleAddLayoutElement = async (type: 'mesa' | 'barra') => {
     if (!establishmentId) return;
     
@@ -198,40 +177,39 @@ export function TacticalGrid({
           establishment_id: establishmentId, 
           name: label,
           type: type,
-          grid_x: 150,                       
-          grid_y: 150,
+          grid_x: 0, // Ya no se usan visualmente, el Grid manda
+          grid_y: 0,
           width: type === 'mesa' ? 120 : 160,
-          height: 75
+          height: 85
         }
       ]);
 
-    if (error) console.error("❌ Error creando mueble arquitectónico:", error.message);
+    if (error) {
+      console.error("❌ Error creando mueble arquitectónico:", error.message);
+    } else {
+      // 🚀 ¡EL FIX! Le decimos a React que vuelva a descargar la lista
+      fetchLayoutElements(); 
+    }
   };
 
   const handleRemoveElement = async (id: string) => {
     await supabase.from('layout_elements').delete().eq('id', id);
   };
 
-  // FUNCIÓN: DESVINCULAR AP-UNIT (Retorno al banco de espera)
+  // FUNCIÓN: DESVINCULAR AP-UNIT
   const handleUnlinkDevice = async (deviceId: string) => {
-    console.log(`🔌 Retornando AP-Unit ${deviceId} al banco de espera...`);
-    
     const { error } = await supabase
       .from('devices')
       .update({ assigned_element_id: null }) 
       .eq('id', deviceId);
 
-    if (error) {
-      console.error("❌ Error al desvincular el dispositivo:", error.message);
-    } else {
-      if (selectedTableId === deviceId) {
-        onTableSelect(null);
-      }
+    if (!error) {
+      if (selectedTableId === deviceId) onTableSelect(null);
       fetchDevices(); 
     }
   };
 
-  // MANEJADORES DE DRAG N' DROP DESDE EL BANCO IZQUIERDO
+  // MANEJADORES DE DRAG N' DROP DE AP-UNITS
   const handleBankDragStart = (e: React.DragEvent, deviceId: string) => {
     e.dataTransfer.setData("text/plain", deviceId);
     e.dataTransfer.effectAllowed = "move";
@@ -253,50 +231,12 @@ export function TacticalGrid({
     const deviceId = e.dataTransfer.getData("text/plain");
     if (!deviceId) return;
 
-    console.log(`🎯 Vinculando por Drop Inalámbrico: AP-Unit ${deviceId} -> Mueble ${elementId}`);
-
-    const targetMueble = layoutElements.find(le => le.id === elementId);
-    const offsetX = targetMueble ? targetMueble.grid_x + 5 : 150;
-    const offsetY = targetMueble ? targetMueble.grid_y + 20 : 150;
-
     const { error } = await supabase
       .from('devices')
-      .update({ 
-        assigned_element_id: elementId,
-        grid_x: offsetX,
-        grid_y: offsetY
-      }) 
+      .update({ assigned_element_id: elementId }) 
       .eq('id', deviceId);
 
-    if (error) {
-      console.error("❌ Error al acoplar desde el banco:", error.message);
-    } else {
-      fetchDevices();
-    }
-  };
-
-  // Persistencia de arrastre de muebles con calibración por offset
-  const handleElementDragEnd = async (id: string, info: any) => {
-    const currentElement = layoutElements.find(e => e.id === id);
-    if (!currentElement) return;
-
-    const deltaX = info.offset.x / zoomLevel;
-    const deltaY = info.offset.y / zoomLevel;
-
-    const calculatedX = Math.round(currentElement.grid_x + deltaX);
-    const calculatedY = Math.round(currentElement.grid_y + deltaY);
-
-    const newX = Math.max(10, Math.min(calculatedX, 2000 - currentElement.width - 10));
-    const newY = Math.max(10, Math.min(calculatedY, 2000 - currentElement.height - 10));
-
-    console.log(`💾 Guardando coordenadas rígidas en Supabase: [X: ${newX}, Y: ${newY}]`);
-
-    setLayoutElements(prev => prev.map(e => e.id === id ? { ...e, grid_x: newX, grid_y: newY } : e));
-
-    await supabase
-      .from('layout_elements')
-      .update({ grid_x: newX, grid_y: newY })
-      .eq('id', id);
+    if (!error) fetchDevices();
   };
 
   const handleRenameElement = async (id: string) => {
@@ -304,7 +244,6 @@ export function TacticalGrid({
       setEditingElementId(null);
       return;
     }
-
     const cleanName = editingName.trim().toUpperCase();
     const { error } = await supabase
       .from('layout_elements')
@@ -317,9 +256,7 @@ export function TacticalGrid({
     setEditingElementId(null);
   };
 
-  // Filtrado de las unidades disponibles en el banco izquierdo
   const floatingAPUnits = tables.filter(t => !t.assigned_element_id);
-  const targetDevice = tables.find(t => t.id === selectedTableId);
 
   return (
     <div className="h-full flex gap-4 overflow-hidden p-2 relative">
@@ -397,27 +334,17 @@ export function TacticalGrid({
           )}
         </div>
 
-        {/* 🚀 NUEVA SECCIÓN DE ZOOM UNIFICADA DENTRO DEL CONTENEDOR */}
+        {/* CONTROLES DE ZOOM */}
         <div className="border-t border-aura-dark/60 pt-3 mt-3 shrink-0 flex flex-col gap-2">
           <p className="text-[9px] opacity-40 uppercase tracking-tighter font-mono">Calibración de Viewport:</p>
           <div className="bg-aura-black border border-aura-dark/80 p-2 rounded flex items-center justify-between gap-3 font-mono">
             <div className="flex flex-col items-center gap-2 py-1">
-              <button onClick={handleZoomIn} className="p-1 text-aura-green/70 hover:text-aura-green hover:bg-aura-green/10 transition-all rounded" title="Acercar"><ZoomIn size={14} /></button>
-              <button onClick={handleZoomOut} className="p-1 text-aura-green/70 hover:text-aura-green hover:bg-aura-green/10 transition-all rounded" title="Alejar"><ZoomOut size={14} /></button>
+              <button onClick={handleZoomIn} className="p-1 text-aura-green/70 hover:text-aura-green hover:bg-aura-green/10 transition-all rounded"><ZoomIn size={14} /></button>
+              <button onClick={handleZoomOut} className="p-1 text-aura-green/70 hover:text-aura-green hover:bg-aura-green/10 transition-all rounded"><ZoomOut size={14} /></button>
             </div>
-            
             <div className="flex-1 flex items-center px-1">
-              <input 
-                type="range" 
-                min="0.5" 
-                max="2.0" 
-                step="0.05" 
-                value={zoomLevel}
-                onChange={(e) => setZoomLevel(parseFloat(e.target.value))} 
-                className="accent-aura-green cursor-pointer w-full h-1 bg-aura-dark rounded-lg appearance-none"
-              />
+              <input type="range" min="0.5" max="2.0" step="0.05" value={zoomLevel} onChange={(e) => setZoomLevel(parseFloat(e.target.value))} className="accent-aura-green cursor-pointer w-full h-1 bg-aura-dark rounded-lg appearance-none" />
             </div>
-
             <div className="flex flex-col items-end shrink-0 border-l border-aura-dark/60 pl-2 min-w-[45px]">
               <button onClick={handleResetZoom} className="text-[9px] text-center text-aura-cyan border border-aura-cyan/20 px-1 py-0.5 rounded font-bold tracking-tighter hover:bg-aura-cyan/10 transition-colors">
                 {Math.round(zoomLevel * 100)}%
@@ -428,115 +355,99 @@ export function TacticalGrid({
         </div>
       </div>
 
-      {/* 🌌 CAPA REAL: VIEWPORT DEL MAPA */}
+      {/* 🌌 CAPA REAL: VIEWPORT DEL MAPA (AHORA UN CSS GRID) */}
       <div 
         ref={constraintsRef} 
-        className="absolute inset-0 overflow-auto select-none"
+        className="flex-1 overflow-auto select-none rounded-lg border-2 border-aura-dark bg-aura-black/50"
         style={{ 
           backgroundImage: 'radial-gradient(var(--color-aura-dark) 1px, transparent 1px)', 
           backgroundSize: '24px 24px',
-          scrollBehavior: 'auto' 
         }}
       >
+        <div style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left', minWidth: '100%', minHeight: '100%' }} className="p-8">
+          
+          {/* 🚀 CSS GRID MATRIX: Auto-acomodo de estructuras */}
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-6 w-full">
+            
+            {layoutElements.map(element => {
+              const isBarra = element.type === 'barra';
+              const dockedDevice = tables.find(t => t.assigned_element_id === element.id);
+              const isCurrentlyEditing = editingElementId === element.id;
+              const isDraggingOverMe = dragOverElementId === element.id;
 
-        {/* CONTENEDOR GRID */}
-        <div
-          style={{ 
-            transform: `scale(${zoomLevel})`, 
-            width: '2000px', 
-            height: '2000px', 
-            transformOrigin: 'top left' 
-          }}
-          className="absolute top-0 left-0 p-10"
-        >
-          {/* A. RENDER DE ESTRUCTURAS FÍSICAS */}
-          {layoutElements.map(element => {
-            const isBarra = element.type === 'barra';
-            const dockedDevice = tables.find(t => t.assigned_element_id === element.id);
-            const isCurrentlyEditing = editingElementId === element.id;
-            const isDraggingOverMe = dragOverElementId === element.id;
-
-            return (
-              <motion.div
-                key={element.id}
-                drag={!isCurrentlyEditing}
-                dragMomentum={false}
-                dragElastic={0}
-                dragTransition={{ power: 0, timeConstant: 0 }}
-                
-                onDragOver={(e) => handleMesaDragOver(e, element.id)}
-                onDragLeave={handleMesaDragLeave}
-                onDrop={(e) => handleMesaDrop(e, element.id)}
-                
-                style={{ x: element.grid_x, y: element.grid_y, width: element.width, height: element.height, transformOrigin: 'top left' }}
-                className={`absolute p-2 rounded-lg border-2 bg-aura-bg/80 backdrop-blur-sm group flex flex-col justify-between z-10 cursor-grab active:cursor-grabbing ${isDraggingOverMe ? 'border-aura-cyan bg-aura-cyan/20 scale-[1.03] shadow-[0_0_25px_rgba(0,255,242,0.3)]' : isBarra ? 'border-purple-600/50 shadow-[0_0_15px_rgba(168,85,247,0.05)]' : 'border-aura-green/40'}`}
-              >
-                {/* Botonera de Control del mueble */}
-                <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity z-30">
-                  <button 
-                    onClick={() => handleRemoveElement(element.id)}
-                    className="p-0.5 bg-aura-dark border border-aura-red text-aura-red rounded-full cursor-pointer hover:scale-110 transition-transform"
-                    title="Eliminar mueble del layout"
-                  >
-                    <X size={10} />
-                  </button>
-                </div>
-
-                {/* Nombre del Mueble */}
-                <div className="flex justify-between items-center w-full min-h-[20px]">
-                  {isCurrentlyEditing ? (
-                    <input
-                      autoFocus type="text" value={editingName} onChange={e => setEditingName(e.target.value)}
-                      onBlur={() => handleRenameElement(element.id)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleRenameElement(element.id); if (e.key === 'Escape') setEditingElementId(null); }}
-                      className="bg-aura-black text-[10px] text-white font-bold font-mono border-b border-aura-cyan outline-none w-[80%] uppercase px-1 py-0"
-                    />
-                  ) : (
-                    <span 
-                      onDoubleClick={() => { setEditingElementId(element.id); setEditingName(element.name); }}
-                      className={`text-[10px] uppercase tracking-wider font-bold cursor-edit select-none truncate pr-2 w-[85%] ${isBarra ? 'text-purple-400' : 'text-aura-green/60'}`}
+              return (
+                <motion.div
+                  layout // 💫 Esto hace que cuando se agrega o borra una mesa, las demás se deslicen suavemente
+                  key={element.id}
+                  onDragOver={(e) => handleMesaDragOver(e, element.id)}
+                  onDragLeave={handleMesaDragLeave}
+                  onDrop={(e) => handleMesaDrop(e, element.id)}
+                  style={{ minHeight: element.height }}
+                  className={`relative p-3 rounded-lg border-2 bg-aura-bg/90 backdrop-blur-sm group flex flex-col justify-between z-10 transition-colors duration-200 ${isDraggingOverMe ? 'border-aura-cyan bg-aura-cyan/20 scale-[1.03] shadow-[0_0_25px_rgba(0,255,242,0.3)]' : isBarra ? 'border-purple-600/50 shadow-[0_0_15px_rgba(168,85,247,0.05)]' : 'border-aura-green/40'}`}
+                >
+                  {/* Botonera de Control del mueble */}
+                  <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity z-30">
+                    <button 
+                      onClick={() => handleRemoveElement(element.id)}
+                      className="p-1 bg-aura-dark border border-aura-red text-aura-red rounded-full cursor-pointer hover:bg-aura-red hover:text-white transition-colors"
                     >
-                      {element.name}
-                    </span>
-                  )}
-                  <Move size={10} className="opacity-20 group-hover:opacity-60 transition-opacity text-white shrink-0" />
-                </div>
+                      <X size={12} />
+                    </button>
+                  </div>
 
-                {/* Espacio del AP-Unit dentro de la mesa */}
-                <div className="flex-1 flex items-center justify-center border border-dashed border-aura-dark/60 rounded bg-aura-black/40 mt-1 p-1 min-h-[36px]">
-                  {dockedDevice ? (
-                    <div 
-                      onClick={e => { e.stopPropagation(); onTableSelect(dockedDevice.id); }}
-                      className={`w-full h-full flex items-center justify-between px-2 bg-aura-panel/90 border text-[11px] font-bold text-white rounded cursor-pointer hover:brightness-125 transition-all relative group/unit ${selectedTableId === dockedDevice.id ? 'border-aura-cyan shadow-[0_0_8px_rgba(0,255,242,0.4)] bg-aura-cyan/10' : 'border-aura-cyan'}`}
-                    >
-                      <div className="flex items-center gap-1.5 truncate max-w-[70%]">
-                        <Tv size={11} className={dockedDevice.status === 'online' ? "text-aura-green" : "text-slate-500"} />
-                        <span className="truncate">{dockedDevice.name}</span>
-                      </div>
-                      
-                      {/* Botón X de desacople */}
-                      <button 
-                        onClick={e => { 
-                          e.stopPropagation(); 
-                          handleUnlinkDevice(dockedDevice.id); 
-                        }}
-                        className="absolute -top-1.5 -right-1.5 p-0.5 bg-aura-black border border-aura-cyan text-aura-cyan rounded-full opacity-0 group-hover/unit:opacity-100 hover:bg-aura-cyan hover:text-black transition-all z-40 scale-90"
-                        title="Desacoplar unidad"
+                  {/* Nombre del Mueble */}
+                  <div className="flex justify-between items-center w-full min-h-[20px] mb-2">
+                    {isCurrentlyEditing ? (
+                      <input
+                        autoFocus type="text" value={editingName} onChange={e => setEditingName(e.target.value)}
+                        onBlur={() => handleRenameElement(element.id)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleRenameElement(element.id); if (e.key === 'Escape') setEditingElementId(null); }}
+                        className="bg-aura-black text-[11px] text-white font-bold font-mono border-b border-aura-cyan outline-none w-[80%] uppercase px-1"
+                      />
+                    ) : (
+                      <span 
+                        onDoubleClick={() => { setEditingElementId(element.id); setEditingName(element.name); }}
+                        className={`text-[11px] uppercase tracking-wider font-black cursor-text select-none truncate pr-2 w-[85%] ${isBarra ? 'text-purple-400' : 'text-aura-green'}`}
                       >
-                        <X size={8} />
-                      </button>
+                        {element.name}
+                      </span>
+                    )}
+                  </div>
 
-                      <span className={`w-1.5 h-1.5 rounded-full ${dockedDevice.status === 'online' ? 'bg-aura-green shadow-[0_0_6px_#00ff66]' : 'bg-red-500'} group-hover/unit:opacity-0 transition-opacity`} />
-                    </div>
-                  ) : (
-                    <span className="text-[9px] uppercase tracking-tighter opacity-20 font-mono">
-                      {isDraggingOverMe ? "¡Suelta Aquí!" : "Slot Libre"}
-                    </span>
-                  )}
-                </div>
-              </motion.div>
-            );
-          })}
+                  {/* Espacio del AP-Unit dentro de la mesa */}
+                  <div className="flex-1 flex items-center justify-center border border-dashed border-aura-dark/60 rounded bg-aura-black/60 p-1.5 w-full">
+                    {dockedDevice ? (
+                      <div 
+                        onClick={e => { e.stopPropagation(); onTableSelect(dockedDevice.id); }}
+                        className={`w-full h-full flex items-center justify-between px-3 bg-aura-panel border text-[11px] font-bold text-white rounded cursor-pointer hover:brightness-125 transition-all relative group/unit ${selectedTableId === dockedDevice.id ? 'border-aura-cyan shadow-[0_0_12px_rgba(0,255,242,0.4)] bg-aura-cyan/10' : 'border-aura-cyan/50'}`}
+                      >
+                        <div className="flex items-center gap-2 truncate max-w-[70%]">
+                          <Tv size={12} className={dockedDevice.status === 'online' ? "text-aura-green" : "text-slate-500"} />
+                          <span className="truncate">{dockedDevice.name}</span>
+                        </div>
+                        
+                        {/* Botón X de desacople */}
+                        <button 
+                          onClick={e => { e.stopPropagation(); handleUnlinkDevice(dockedDevice.id); }}
+                          className="absolute -top-1.5 -right-1.5 p-1 bg-aura-black border border-aura-cyan text-aura-cyan rounded-full opacity-0 group-hover/unit:opacity-100 hover:bg-aura-cyan hover:text-black transition-all z-40 scale-90 shadow-md"
+                          title="Desacoplar unidad"
+                        >
+                          <X size={10} />
+                        </button>
+
+                        <span className={`w-2 h-2 rounded-full ${dockedDevice.status === 'online' ? 'bg-aura-green shadow-[0_0_8px_#00ff66]' : 'bg-red-500'} group-hover/unit:opacity-0 transition-opacity`} />
+                      </div>
+                    ) : (
+                      <span className="text-[10px] uppercase tracking-widest opacity-30 font-mono text-center w-full">
+                        {isDraggingOverMe ? "¡Suelta Aquí!" : "Slot Libre"}
+                      </span>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+
         </div>
       </div>
     </div>
