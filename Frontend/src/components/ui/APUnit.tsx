@@ -208,13 +208,13 @@ export default function APUnit() {
           
           // Genera un ID único rápido para el dispositivo y lo inyecta en la DB
           currentId = crypto.randomUUID();
-          const { error: insertError } = await supabase.from('devices').insert({
+          const { error: insertError } = await supabase.from('devices').upsert({
              id: currentId,
-             name: `NODE-${currentId}`,
+             name: `NODE-${currentId.substring(0, 6).toUpperCase()}`,
              status: 'online',
              establishment_id: myEstId,
              last_heartbeat: new Date().toISOString()
-          });
+          }, { onConflict: 'id' });
 
           if (insertError) {
              console.error("Fallo al auto-provisionar hardware:", insertError);
