@@ -161,7 +161,7 @@ export default function APUnit() {
       const params = new URLSearchParams(window.location.search);
       const currentMode = params.get('mode');
       let currentId = params.get('id');
-      const paramEstId = params.get('est'); // <-- Nueva variable para la URL
+      const paramEstId = params.get('est'); // <-- 🚀 EXTRAEMOS EL ESTABLECIMIENTO DE LA URL
 
       if (currentId && currentMode !== 'apunit') return; 
 
@@ -172,9 +172,9 @@ export default function APUnit() {
         let activeTabs = [];
         try { activeTabs = JSON.parse(rawStorage || '[]'); } catch { activeTabs = []; }
 
-        // 2. Buscamos el establecimiento que le pertenece al usuario logueado o lo tomamos de la URL
+        // 2. Buscamos el establecimiento que le pertenece al usuario logueado O DE LA URL
         const { data: sessionData } = await supabase.auth.getSession();
-        let myEstId = paramEstId || null; // <-- Toma el ID de la URL primero
+        let myEstId = paramEstId || null; // <-- 🚀 TOMA EL ID DE LA URL PRIMERO
         if (!myEstId && sessionData?.session?.user) {
            const { data: est } = await supabase
              .from('establishments')
@@ -199,10 +199,10 @@ export default function APUnit() {
 
         if (!availableDevice) {
           // =========================================================
-          // 🚀 BOOT SEQUENCE: AUTO-PROVISIONAMIENTO (Efecto Observador FIx)
+          // 🚀 BOOT SEQUENCE: AUTO-PROVISIONAMIENTO
           // =========================================================
           if (!myEstId) {
-             if (isMounted) setErrorMsg("NO_HARDWARE_FOUND (Falta el parámetro 'est' en la URL o sesión de Admin)");
+             if (isMounted) setErrorMsg("NO_HARDWARE_FOUND (Falta el parámetro '&est=' en la URL o iniciar sesión)");
              return;
           }
           
