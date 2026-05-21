@@ -207,7 +207,7 @@ export default function APUnit() {
           }
           
           // Genera un ID único rápido para el dispositivo y lo inyecta en la DB
-          currentId = `AP-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+          currentId = crypto.randomUUID();
           const { error: insertError } = await supabase.from('devices').insert({
              id: currentId,
              name: `NODE-${currentId}`,
