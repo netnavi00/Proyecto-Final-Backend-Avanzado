@@ -27,7 +27,6 @@ const HARDWARE_CATALOG = [
   { id: 'e5', type: 'event', name: 'LADIES NIGHT', imageUrl: 'https://loremflickr.com/300/300/party,girls?lock=21' },
 ];
 
-/* --- COMPONENTE RENDERIZADOR DE SLOTS DE HARDWARE --- */
 /* --- COMPONENTE RENDERIZADOR DE SLOTS DE HARDWARE MEJORADO --- */
 function KioskSlotRender({ id, config, catalog }: { id: string, config: any, catalog: any[] }) {
   if (!config) return null;
@@ -165,7 +164,7 @@ export default function APUnit() {
 
       if (currentId && currentMode !== 'apunit') return; 
 
-      // 🔍 Si entramos por ?mode=apunit sin ID fijo, buscamos dinámicamente
+      // 🔍 Si entramos por ?mode=apunit sin ID fijo, buscamos o creamos dinámicamente
       if (!currentId) {
         // 1. Limpiamos y leemos las pestañas activas del navegador
         const rawStorage = localStorage.getItem('aura_active_units');
@@ -198,11 +197,35 @@ export default function APUnit() {
         const availableDevice = allDevices?.find(d => !activeTabs.includes(d.id));
 
         if (!availableDevice) {
-          if (isMounted) setErrorMsg("NO_HARDWARE_FOUND_IN_DB");
-          return;
+          // =========================================================
+          // 🚀 BOOT SEQUENCE: AUTO-PROVISIONAMIENTO (Efecto Observador FIx)
+          // =========================================================
+          if (!myEstId) {
+             if (isMounted) setErrorMsg("NO_HARDWARE_FOUND (Inicia sesión como Admin primero para vincular la red)");
+             return;
+          }
+          
+          // Genera un ID único rápido para el dispositivo y lo inyecta en la DB
+          currentId = `AP-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+          const { error: insertError } = await supabase.from('devices').insert({
+             id: currentId,
+             name: `NODE-${currentId}`,
+             status: 'online',
+             establishment_id: myEstId,
+             last_heartbeat: new Date().toISOString()
+          });
+
+          if (insertError) {
+             console.error("Fallo al auto-provisionar hardware:", insertError);
+             if (isMounted) setErrorMsg("HARDWARE_PROVISIONING_FAILED");
+             return;
+          }
+          console.log(`[SYS.BOOT] Nodo auto-registrado en la red: ${currentId}`);
+          
+        } else {
+          currentId = availableDevice.id;
         }
         
-        currentId = availableDevice.id;
         activeTabs.push(currentId);
         localStorage.setItem('aura_active_units', JSON.stringify(activeTabs));
       }
@@ -212,12 +235,12 @@ export default function APUnit() {
       activeIdRef.current = currentId;
       setDeviceId(currentId);
 
-      // Sincronizar estado inicial en la base de datos a ONLINE
+      // Sincronizar estado inicial en la base de datos a ONLINE (El ping de arranque oficial)
       const { data: currentDeviceState, error: updateError } = await supabase
         .from('devices')
         .update({ status: 'online', last_heartbeat: new Date().toISOString() })
         .eq('id', currentId)
-        .select('status, is_mirroring_active, current_recipe')
+        .select('status, is_mirroring_active, current_recipe, name') // Ahora traemos el nombre
         .maybeSingle();
 
       if (updateError) {
