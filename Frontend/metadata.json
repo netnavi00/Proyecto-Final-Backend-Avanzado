@@ -1,6 +1,6 @@
 {
   "name": "Aura Play Command Center",
-  "description": "Industrial control interface (HMI/SCADA) with Cyber-Industrial aesthetic for managing tables, creatives, and mission control.",
+  "description": "HMI/SCADA dashboard for AP-Unit orchestration, digital signage routing, gamification and hardware telemetry.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }

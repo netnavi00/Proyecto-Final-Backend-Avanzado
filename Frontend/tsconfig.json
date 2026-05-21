@@ -1,25 +1,34 @@
 {
   "compilerOptions": {
+    /* MOTOR DE COMPILACIÓN: El sistema define la versión moderna de JavaScript como objetivo base. */
     "target": "ES2022",
-    "experimentalDecorators": true,
-    "useDefineForClassFields": false,
     "module": "ESNext",
+    
+    /* LIBRERÍAS CORE: Habilita el acceso nativo a las APIs del navegador y sintaxis moderna. */
     "lib": [
       "ES2022",
       "DOM",
       "DOM.Iterable"
     ],
-    "skipLibCheck": true,
+    
+    /* INTEROPERABILIDAD: Permite la coexistencia segura y carga de archivos JavaScript estándar en el proyecto. */
+    "allowJs": true,
+    
+    /* RENDERIZADO UI: Configura el motor para transformar automáticamente la sintaxis JSX para React sin requerir importaciones manuales. */
+    "jsx": "react-jsx",
+    
+    /* SISTEMA DE RUTAS: Enrutamiento absoluto sincronizado con el kernel de Vite (@/) para evitar rutas relativas anidadas. */
+    "paths": {
+      "@/*": ["./*"]
+    },
+    
+    /* RESOLUCIÓN Y EMPAQUETADO: Parámetros optimizados para empaquetadores de alta velocidad (Vite/Vercel). */
     "moduleResolution": "bundler",
     "isolatedModules": true,
     "moduleDetection": "force",
-    "allowJs": true,
-    "jsx": "react-jsx",
-    "paths": {
-      "@/*": [
-        "./*"
-      ]
-    },
+    
+    /* OPTIMIZACIÓN DE RENDIMIENTO: El sistema ignora la validación profunda de dependencias externas (node_modules) y delega la transpilación a Vite. */
+    "skipLibCheck": true,
     "allowImportingTsExtensions": true,
     "noEmit": true
   }

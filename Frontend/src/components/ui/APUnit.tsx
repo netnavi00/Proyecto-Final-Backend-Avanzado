@@ -2,7 +2,9 @@ import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../services/supabase';
 import { Cpu, Activity } from 'lucide-react';
 
-/* --- CATÁLOGO BASE DE HARDWARE (Para resolución de elementos locales) --- */
+/* * SYS.CATALOG: HARDWARE_CATALOG
+ * El sistema mantiene una reserva local de elementos multimedia de emergencia.
+ */
 const HARDWARE_CATALOG = [
   { id: 'p1', type: 'menu', name: 'NEON LAGER', price: 5.00, imageUrl: 'https://loremflickr.com/300/300/lager,beer?lock=1' },
   { id: 'p2', type: 'menu', name: 'CYBER WINGS', price: 12.50, imageUrl: 'https://loremflickr.com/300/300/chicken,wings?lock=2' },
@@ -27,27 +29,25 @@ const HARDWARE_CATALOG = [
   { id: 'e5', type: 'event', name: 'LADIES NIGHT', imageUrl: 'https://loremflickr.com/300/300/party,girls?lock=21' },
 ];
 
-/* --- COMPONENTE RENDERIZADOR DE SLOTS DE HARDWARE MEJORADO --- */
+/* * SYS.RENDER: KioskSlotRender
+ * El motor procesa las coordenadas y reglas de estilo para dibujar elementos individuales en la pantalla.
+ */
 function KioskSlotRender({ id, config, catalog }: { id: string, config: any, catalog: any[] }) {
   if (!config) return null;
   
-  // 1. Buscamos el ítem en el catálogo (A prueba de errores)
   const safeCatalog = Array.isArray(catalog) ? catalog : [];
   const item = config.boundItemId ? (safeCatalog.find(i => i.id === config.boundItemId) || HARDWARE_CATALOG.find(i => i.id === config.boundItemId)) : null;
   
-  // 2. Lógica de Fallback: Rescata imágenes o textos personalizados aunque no haya ítem
   const bgImage = item?.imageUrl || config.imageUrl;
   const displayText = config.customText || item?.name;
   const displayPrice = item?.type === 'menu' ? item.price : undefined;
   
-  // 3. Verificamos si hay ALGO que mostrar
   const hasContent = !!(bgImage || displayText);
 
   return (
     <div className="w-full h-full relative overflow-hidden bg-[#050505] border border-aura-dark/30">
       {hasContent ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          {/* Fondo (Imagen o Color) */}
           {bgImage && (
             <div 
               className="absolute inset-0 bg-cover bg-center mix-blend-screen transition-all duration-1000" 
@@ -56,7 +56,6 @@ function KioskSlotRender({ id, config, catalog }: { id: string, config: any, cat
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black opacity-75" />
           
-          {/* Contenedor de Texto y Precio */}
           <div 
             className="relative z-10 flex flex-col items-center justify-center text-center p-4 w-full h-full"
             style={{ 
@@ -85,7 +84,6 @@ function KioskSlotRender({ id, config, catalog }: { id: string, config: any, cat
              )}
           </div>
 
-          {/* Etiqueta Promocional */}
           {config.sticker && (
              <div 
                className="absolute top-4 right-4 bg-[#ff003c] text-white uppercase font-black transform rotate-12 shadow-[0_0_15px_rgba(255,0,60,0.6)]"
@@ -99,7 +97,6 @@ function KioskSlotRender({ id, config, catalog }: { id: string, config: any, cat
           )}
         </div>
       ) : (
-        // Si de verdad está vacío, mostramos un mensaje que SÍ se vea
         <div className="absolute inset-0 flex items-center justify-center text-[14px] text-aura-cyan/40 uppercase tracking-widest font-bold">
           [ ESPACIO DISPONIBLE: {id} ]
         </div>
@@ -121,18 +118,20 @@ export default function APUnit() {
   const activeIdRef = useRef<string | null>(null);
   const isStreamingRef = useRef<boolean>(false);
   
-  // 🚀 TIMING ENGINE: Carrusel automático
+  /* * SYS.CORE: TIMING ENGINE
+   * El sistema cicla las páginas de la receta activa a un intervalo regular.
+   */
   useEffect(() => {
     if (recipePages.length <= 1) return;
-    
     const interval = setInterval(() => {
       setCurrentPageIdx(prev => (prev + 1) % recipePages.length);
     }, 6000); 
-
     return () => clearInterval(interval);
   }, [recipePages]);
 
-  // 🛡️ PARSER INDESTRUCTIBLE: Compatible con scripts viejos (Array) y nuevos ({pages, catalog})
+  /* * SYS.CORE: PAYLOAD PARSER
+   * El sistema decodifica instrucciones en formato JSON para convertirlas en estado reactivo.
+   */
   const parseAndSetRecipe = (rawRecipe: any) => {
     try {
       let payload = rawRecipe;
@@ -156,79 +155,21 @@ export default function APUnit() {
     let channel: any = null;
     let telemetryInterval: any = null;
 
-    // 🛰️ FUNCIÓN DE INICIALIZACIÓN COMPLETA Y FILTRADA
+    /* * SYS.BOOT: INICIALIZACIÓN ESTRICTA DE HARDWARE
+     * El sistema requiere un ID explícito en la URL para validar la identidad del nodo.
+     * Previene la creación de nodos fantasma y bloquea intentos de acceso no autorizados.
+     */
     const initializeDevice = async () => {
       const params = new URLSearchParams(window.location.search);
       const currentMode = params.get('mode');
-      let currentId = params.get('id');
-      const paramEstId = params.get('est'); // <-- 🚀 EXTRAEMOS EL ESTABLECIMIENTO DE LA URL
+      const currentId = params.get('id');
+      const paramEstId = params.get('est'); 
 
-      if (currentId && currentMode !== 'apunit') return; 
+      if (currentMode !== 'apunit') return; 
 
-      // 🔍 Si entramos por ?mode=apunit sin ID fijo, buscamos o creamos dinámicamente
-      if (!currentId) {
-        // 1. Limpiamos y leemos las pestañas activas del navegador
-        const rawStorage = localStorage.getItem('aura_active_units');
-        let activeTabs = [];
-        try { activeTabs = JSON.parse(rawStorage || '[]'); } catch { activeTabs = []; }
-
-        // 2. Buscamos el establecimiento que le pertenece al usuario logueado O DE LA URL
-        const { data: sessionData } = await supabase.auth.getSession();
-        let myEstId = paramEstId || null; // <-- 🚀 TOMA EL ID DE LA URL PRIMERO
-        if (!myEstId && sessionData?.session?.user) {
-           const { data: est } = await supabase
-             .from('establishments')
-             .select('id')
-             .eq('owner_id', sessionData.session.user.id)
-             .single();
-           if (est) myEstId = est.id;
-        }
-
-        // 3. Consultamos las unidades que correspondan a este establecimiento específico
-        let query = supabase
-          .from('devices')
-          .select('id, status, current_recipe')
-          .in('status', ['provisioned', 'offline', 'online', 'promo']);
-          
-        if (myEstId) query = query.eq('establishment_id', myEstId);
-
-        const { data: allDevices } = await query;
-        
-        // 4. Encontramos un dispositivo que no esté ya abierto en otra pestaña local
-        const availableDevice = allDevices?.find(d => !activeTabs.includes(d.id));
-
-        if (!availableDevice) {
-          // =========================================================
-          // 🚀 BOOT SEQUENCE: AUTO-PROVISIONAMIENTO
-          // =========================================================
-          if (!myEstId) {
-             if (isMounted) setErrorMsg("NO_HARDWARE_FOUND (Falta el parámetro '&est=' en la URL o iniciar sesión)");
-             return;
-          }
-          
-          // Genera un ID único rápido para el dispositivo y lo inyecta en la DB
-          currentId = crypto.randomUUID();
-          const { error: insertError } = await supabase.from('devices').upsert({
-             id: currentId,
-             name: `NODE-${currentId.substring(0, 6).toUpperCase()}`,
-             status: 'online',
-             establishment_id: myEstId,
-             last_heartbeat: new Date().toISOString()
-          }, { onConflict: 'id' });
-
-          if (insertError) {
-             console.error("Fallo al auto-provisionar hardware:", insertError);
-             if (isMounted) setErrorMsg("HARDWARE_PROVISIONING_FAILED (Verifica políticas RLS en Supabase)");
-             return;
-          }
-          console.log(`[SYS.BOOT] Nodo auto-registrado en la red: ${currentId}`);
-          
-        } else {
-          currentId = availableDevice.id;
-        }
-        
-        activeTabs.push(currentId);
-        localStorage.setItem('aura_active_units', JSON.stringify(activeTabs));
+      if (!currentId || !paramEstId) {
+        if (isMounted) setErrorMsg("ACCESS_DENIED: MISSING_HARDWARE_CREDENTIALS");
+        return;
       }
 
       if (!isMounted) return;
@@ -236,16 +177,17 @@ export default function APUnit() {
       activeIdRef.current = currentId;
       setDeviceId(currentId);
 
-      // Sincronizar estado inicial en la base de datos a ONLINE (El ping de arranque oficial)
+      // El sistema sincroniza su estado a ONLINE solo si el registro existe en la base de datos.
       const { data: currentDeviceState, error: updateError } = await supabase
         .from('devices')
         .update({ status: 'online', last_heartbeat: new Date().toISOString() })
         .eq('id', currentId)
-        .select('status, is_mirroring_active, current_recipe, name') // Ahora traemos el nombre
+        .eq('establishment_id', paramEstId) // Filtro de seguridad dual
+        .select('status, is_mirroring_active, current_recipe, name')
         .maybeSingle();
 
-      if (updateError) {
-        if (isMounted) setErrorMsg("CONNECTION_REJECTED");
+      if (updateError || !currentDeviceState) {
+        if (isMounted) setErrorMsg("CONNECTION_REJECTED: UNREGISTERED_NODE");
         return;
       } else {
         if (isMounted) {
@@ -262,7 +204,9 @@ export default function APUnit() {
         }
       }
 
-      // MOTOR DE TELEMETRÍA (Frecuencia base 5s)
+      /* * SYS.TELEMETRY: MOTOR DE DIAGNÓSTICO
+       * El sistema envía un pulso de vida a la base de datos cada 5 segundos.
+       */
       telemetryInterval = setInterval(async () => {
         if (!isMounted || !currentId) return;
         
@@ -287,7 +231,9 @@ export default function APUnit() {
           });
       }, 5000);
 
-      // 🚀 ESCUCHADOR REALTIME SCADA SIN INTERRUPCIONES
+      /* * SYS.NETWORK: PROTOCOLO WEBSOCKET REALTIME
+       * El sistema se suscribe a un canal privado de Supabase para recibir actualizaciones de estado y recetas al instante.
+       */
       if (isMounted && currentId) {
         channel = supabase
           .channel(`unit-uplink-${currentId}`)
@@ -319,20 +265,17 @@ export default function APUnit() {
       }
     };
 
-    // 🔥 LLAMADA AUTOMÁTICA AL MONTAR EL COMPONENTE
     initializeDevice();
 
-    // 🧹 CLEANUP DE SALIDA
+    /* * SYS.CLEANUP: SHUTDOWN PROTOCOL
+     * El sistema purga canales abiertos y actualiza el estado a OFFLINE antes de la terminación.
+     */
     return () => { 
       isMounted = false; 
       if (telemetryInterval) clearInterval(telemetryInterval);
       const idToShutdown = activeIdRef.current;
       
       if (idToShutdown) {
-        const activeTabs = JSON.parse(localStorage.getItem('aura_active_units') || '[]');
-        const updatedTabs = activeTabs.filter((id: string) => id !== idToShutdown);
-        localStorage.setItem('aura_active_units', JSON.stringify(updatedTabs));
-
         supabase.from('device_telemetry').delete().eq('device_id', idToShutdown).then(() => {
           supabase
             .from('devices')
@@ -344,10 +287,11 @@ export default function APUnit() {
     };
   }, []); 
 
-  if (errorMsg) return <div className="h-screen flex items-center justify-center bg-black p-10 text-red-500 font-mono text-xl">ERROR: {errorMsg}</div>;
+  // --- VISTAS DE ESTADO DEL KIOSKO ---
+
+  if (errorMsg) return <div className="h-screen flex items-center justify-center bg-black p-10 text-red-500 font-mono text-xl">SYS.ERROR: {errorMsg}</div>;
   if (!deviceId) return <div className="h-screen flex items-center justify-center bg-black p-10 text-aura-cyan font-mono animate-pulse text-xl">BOOTING_KIOSK_OS...</div>;
 
-  // MODO DIAGNÓSTICO AZUL
   if (status === 'running') {
     return (
       <div className="h-screen w-screen bg-cyan-950 text-aura-cyan flex flex-col items-center justify-center font-mono p-10 border-[16px] border-aura-dark shadow-[inset_0_0_60px_rgba(0,243,255,0.15)]">
@@ -362,16 +306,11 @@ export default function APUnit() {
     );
   }
 
-  // MODO PROMO: SEÑALIZACIÓN DIGITAL INTERACTIVA
   if (recipePages.length > 0 && recipePages[currentPageIdx]) {
     const activePage = recipePages[currentPageIdx];
 
-    const safeLayout = activePage.layout || 'full';
-    const safeSlots = activePage.slots || { 'slot-0': activePage };
-    
     return (
       <div className="h-screen w-screen bg-black text-white overflow-hidden flex flex-col relative p-4 select-none">
-        {/* 🚀 ETIQUETA DE TELEMETRÍA VISIBLE */}
         <div className="absolute top-3 left-4 text-[11px] font-mono text-aura-cyan font-bold tracking-widest z-50 bg-black/60 px-3 py-1.5 border border-aura-cyan/30 shadow-[0_0_10px_rgba(0,0,0,0.8)] backdrop-blur-sm flex items-center gap-2">
           <span className="w-2 h-2 bg-aura-cyan rounded-full animate-pulse"></span>
           AURA-NET // {deviceName !== 'UNIT_UNKNOWN' ? deviceName.toUpperCase() : 'AP-UNIT'} [ ID: {deviceId?.split('-')[0]} ] // PAGE {currentPageIdx + 1} OF {recipePages.length}
@@ -403,7 +342,6 @@ export default function APUnit() {
     );
   }
 
-  // MODO STANDBY VERDE TERMINAL
   return (
     <div className="h-screen w-screen bg-black text-green-500 flex flex-col items-center justify-center font-mono p-10 border-[16px] border-aura-dark">
       <Cpu size={80} className="mb-6 text-green-500 animate-bounce" style={{ animationDuration: '4s' }} />
