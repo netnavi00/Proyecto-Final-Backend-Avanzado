@@ -161,6 +161,7 @@ export default function APUnit() {
       const params = new URLSearchParams(window.location.search);
       const currentMode = params.get('mode');
       let currentId = params.get('id');
+      const paramEstId = params.get('est'); // <-- Nueva variable para la URL
 
       if (currentId && currentMode !== 'apunit') return; 
 
@@ -171,10 +172,10 @@ export default function APUnit() {
         let activeTabs = [];
         try { activeTabs = JSON.parse(rawStorage || '[]'); } catch { activeTabs = []; }
 
-        // 2. Buscamos el establecimiento que le pertenece al usuario logueado
+        // 2. Buscamos el establecimiento que le pertenece al usuario logueado o lo tomamos de la URL
         const { data: sessionData } = await supabase.auth.getSession();
-        let myEstId = null;
-        if (sessionData?.session?.user) {
+        let myEstId = paramEstId || null; // <-- Toma el ID de la URL primero
+        if (!myEstId && sessionData?.session?.user) {
            const { data: est } = await supabase
              .from('establishments')
              .select('id')
@@ -201,7 +202,7 @@ export default function APUnit() {
           // 🚀 BOOT SEQUENCE: AUTO-PROVISIONAMIENTO (Efecto Observador FIx)
           // =========================================================
           if (!myEstId) {
-             if (isMounted) setErrorMsg("NO_HARDWARE_FOUND (Inicia sesión como Admin primero para vincular la red)");
+             if (isMounted) setErrorMsg("NO_HARDWARE_FOUND (Falta el parámetro 'est' en la URL o sesión de Admin)");
              return;
           }
           
@@ -217,7 +218,7 @@ export default function APUnit() {
 
           if (insertError) {
              console.error("Fallo al auto-provisionar hardware:", insertError);
-             if (isMounted) setErrorMsg("HARDWARE_PROVISIONING_FAILED");
+             if (isMounted) setErrorMsg("HARDWARE_PROVISIONING_FAILED (Verifica políticas RLS en Supabase)");
              return;
           }
           console.log(`[SYS.BOOT] Nodo auto-registrado en la red: ${currentId}`);
