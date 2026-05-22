@@ -114,9 +114,16 @@ export function SlotRender({ id, config, catalog, onSelect, isSelected }: { id: 
                style={{ 
                  transform: `rotate(${config.rotation || 0}deg) translate(${config.posX || 0}px, ${config.posY || 0}px)` 
                }}>
+             {/* TÍTULO PRINCIPAL MODIFICADO */}
              <h3 
-               className={`${config.fontFamily || 'font-mono'} text-aura-text font-black uppercase leading-tight tracking-widest drop-shadow-lg`}
-               style={{ fontSize: `${config.customTextSize || 24}px` }}
+               className={`${config.fontFamily || 'font-mono'} font-black uppercase leading-tight tracking-widest ${item.type !== 'event' ? 'text-aura-text drop-shadow-lg' : ''}`}
+               style={{ 
+                 fontSize: `${config.customTextSize || 24}px`,
+                 // Si es un evento, pintamos el texto con el color neón. Si no, usa el default.
+                 color: item.type === 'event' ? config.neonColor : undefined,
+                 // Si es un evento, le damos el brillo neón al título.
+                 textShadow: item.type === 'event' ? `0 0 15px ${config.neonColor}` : undefined
+               }}
              >
                {config.customText || item.name}
              </h3>
@@ -507,7 +514,7 @@ return (
     <div className="h-full flex flex-col">
       
       {/* ========================================================= */}
-      /* 1️⃣ HEADER PRINCIPAL: Título, Storage y Guardar            */
+      {/* 1️⃣ HEADER PRINCIPAL: Título, Storage y Guardar            */}
       {/* ========================================================= */}
       <div className="flex flex-col xl:flex-row items-start xl:items-center w-full shrink-0 gap-6 mb-[12px]">
         <h2 className="text-[13px] font-bold flex flex-col xl:flex-row items-center w-full shrink-0 gap-4">
