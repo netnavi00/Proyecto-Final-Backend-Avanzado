@@ -253,7 +253,10 @@ export function AuraCentral() {
               ) : (
                 establishment.map((e) => (
                   <tr key={e.id} className="border-b border-aura-dark/30 hover:bg-aura-dark/20 transition-colors">
-                    <td className="p-4 text-aura-text font-bold uppercase tracking-widest">{e.name}</td>
+                    <td className="p-4">
+                      <div className="text-aura-text font-bold uppercase tracking-widest">{e.name}</div>
+                      <div className="text-[9px] opacity-30 select-all">{e.id}</div>
+                    </td>
                     <td className="p-4">
                       <span className="px-2 py-1 border border-aura-cyan/50 text-aura-cyan text-[10px] font-bold uppercase">{e.tier}</span>
                     </td>
