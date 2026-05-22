@@ -2,75 +2,36 @@ import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../services/supabase';
 import { Cpu, Activity } from 'lucide-react';
 
-/* * SYS.CATALOG: HARDWARE_CATALOG
- * El sistema mantiene una reserva local de elementos multimedia de emergencia.
- */
-const HARDWARE_CATALOG = [
-  { id: 'p1', type: 'menu', name: 'NEON LAGER', price: 5.00, imageUrl: 'https://loremflickr.com/300/300/lager,beer?lock=1' },
-  { id: 'p2', type: 'menu', name: 'CYBER WINGS', price: 12.50, imageUrl: 'https://loremflickr.com/300/300/chicken,wings?lock=2' },
-  { id: 'p3', type: 'menu', name: 'VIP PROTOCOL', price: 50.00, imageUrl: 'https://loremflickr.com/300/300/champagne,vip?lock=3' },
-  { id: 'p4', type: 'menu', name: 'MATRIX SHOT', price: 8.50, imageUrl: 'https://loremflickr.com/300/300/shot,drink?lock=4' },
-  { id: 'p5', type: 'menu', name: 'EMP BURGER', price: 16.00, imageUrl: 'https://loremflickr.com/300/300/burger?lock=5' },
-  { id: 'p6', type: 'menu', name: 'GLITCH PIZZA', price: 18.00, imageUrl: 'https://loremflickr.com/300/300/pizza?lock=6' },
-  { id: 'p7', type: 'menu', name: 'QUANTUM SODA', price: 4.50, imageUrl: 'https://loremflickr.com/300/300/soda,can?lock=7' },
-  { id: 'p8', type: 'menu', name: 'NEBULA DESSERT', price: 9.00, imageUrl: 'https://loremflickr.com/300/300/dessert?lock=8' },
-  { id: 'p9', type: 'menu', name: 'SYNTH COCKTAIL', price: 14.00, imageUrl: 'https://loremflickr.com/300/300/cocktail,neon?lock=9' },
-  { id: 'p10', type: 'menu', name: 'DARK MATTER STOUT', price: 7.50, imageUrl: 'https://loremflickr.com/300/300/stout,beer?lock=10' },
-  { id: 'p11', type: 'menu', name: 'PLASMA WINGS', price: 14.00, imageUrl: 'https://loremflickr.com/300/300/spicy,wings?lock=11' },
-  { id: 'p12', type: 'menu', name: 'HOLOGRAPHIC DONUT', price: 6.00, imageUrl: 'https://loremflickr.com/300/300/donut?lock=12' },
-  { id: 'p13', type: 'menu', name: 'MECH TACOS', price: 11.00, imageUrl: 'https://loremflickr.com/300/300/tacos?lock=13' },
-  { id: 'p14', type: 'menu', name: 'OVERCLOCK FRIES', price: 5.50, imageUrl: 'https://loremflickr.com/300/300/fries?lock=14' },
-  { id: 'p15', type: 'menu', name: 'NANO ICE CREAM', price: 7.00, imageUrl: 'https://loremflickr.com/300/300/ice-cream?lock=15' },
-  { id: 'p16', type: 'menu', name: 'IPA BIOS', price: 8.00, imageUrl: 'https://loremflickr.com/300/300/ipa,beer?lock=16' },
-  { id: 'e1', type: 'event', name: 'LIVE DJ SET', imageUrl: 'https://loremflickr.com/300/300/dj,club?lock=17' },
-  { id: 'e2', type: 'event', name: 'KARAOKE MONDAYS', imageUrl: 'https://loremflickr.com/300/300/karaoke?lock=18' },
-  { id: 'e3', type: 'event', name: 'NEON PARTY', imageUrl: 'https://loremflickr.com/300/300/neon,party?lock=19' },
-  { id: 'e4', type: 'event', name: 'SYSTEM REBOOT', imageUrl: 'https://loremflickr.com/300/300/cyberpunk,city?lock=20' },
-  { id: 'e5', type: 'event', name: 'LADIES NIGHT', imageUrl: 'https://loremflickr.com/300/300/party,girls?lock=21' },
-];
-
-/* * SYS.RENDER: KioskSlotRender
- * El motor procesa las coordenadas y reglas de estilo para dibujar elementos individuales en la pantalla.
- */
+/* --- COMPONENTE SUB-RENDERIZADOR DE SLOTS PARA EL HARDWARE --- */
 function KioskSlotRender({ id, config, catalog }: { id: string, config: any, catalog: any[] }) {
   if (!config) return null;
+  const item = config.boundItemId ? catalog.find(i => i.id === config.boundItemId) : null;
   
-  const safeCatalog = Array.isArray(catalog) ? catalog : [];
-  const item = config.boundItemId ? (safeCatalog.find(i => i.id === config.boundItemId) || HARDWARE_CATALOG.find(i => i.id === config.boundItemId)) : null;
-  
-  const bgImage = item?.imageUrl || config.imageUrl;
-  const displayText = config.customText || item?.name;
-  const displayPrice = item?.type === 'menu' ? item.price : undefined;
-  
-  const hasContent = !!(bgImage || displayText);
-
   return (
-    <div className="w-full h-full relative overflow-hidden bg-[#050505] border border-aura-dark/30">
-      {hasContent ? (
+    <div className="w-full h-full relative overflow-hidden bg-aura-bg border border-aura-dark/20">
+      {item ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          {bgImage && (
-            <div 
-              className="absolute inset-0 bg-cover bg-center mix-blend-screen transition-all duration-1000" 
-              style={{ backgroundImage: `url(${bgImage})`, opacity: config.bgOpacity ?? 0.8 }} 
-            />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black opacity-75" />
-          
+          {/* Imagen de fondo mix-blend de la receta */}
           <div 
-            className="relative z-10 flex flex-col items-center justify-center text-center p-4 w-full h-full"
+            className="absolute inset-0 bg-cover bg-center mix-blend-screen" 
+            style={{ backgroundImage: `url(${item.imageUrl})`, opacity: config.bgOpacity ?? 0.8 }} 
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black opacity-60" />
+          
+          {/* Bloque de transformación espacial exacto */}
+          <div 
+            className="relative z-10 flex flex-col items-center justify-center text-center p-4"
             style={{ 
               transform: `rotate(${config.rotation || 0}deg) translate(${config.posX || 0}px, ${config.posY || 0}px)` 
             }}
           >
-             {displayText && (
-               <h3 
-                 className={`${config.fontFamily || 'font-mono'} text-white font-black uppercase leading-tight tracking-widest drop-shadow-2xl`}
-                 style={{ fontSize: `${config.customTextSize || 24}px` }}
-               >
-                 {displayText}
-               </h3>
-             )}
-             {displayPrice !== undefined && typeof displayPrice === 'number' && (
+             <h3 
+               className={`${config.fontFamily || 'font-mono'} text-white font-black uppercase leading-tight tracking-widest drop-shadow-lg`}
+               style={{ fontSize: `${config.customTextSize || 24}px` }}
+             >
+               {config.customText || item.name}
+             </h3>
+             {item.type === 'menu' && typeof item.price === 'number' && (
                <p 
                  className="font-bold mt-2 tracking-tighter" 
                  style={{ 
@@ -79,14 +40,15 @@ function KioskSlotRender({ id, config, catalog }: { id: string, config: any, cat
                    fontSize: `${(config.customTextSize || 24) * 1.25}px` 
                  }}
                >
-                 ${displayPrice.toFixed(2)}
+                 ${item.price.toFixed(2)}
                </p>
              )}
           </div>
 
+          {/* Sticker Promocional */}
           {config.sticker && (
              <div 
-               className="absolute top-4 right-4 bg-[#ff003c] text-white uppercase font-black transform rotate-12 shadow-[0_0_15px_rgba(255,0,60,0.6)]"
+               className="absolute top-4 right-4 bg-[#ff003c] text-white uppercase font-black transform rotate-12 shadow-[0_0_10px_rgba(255,0,60,0.5)]"
                style={{ 
                  fontSize: `${config.stickerSize || 12}px`, 
                  padding: `${(config.stickerSize || 12) * 0.25}px ${(config.stickerSize || 12) * 0.75}px` 
@@ -97,8 +59,8 @@ function KioskSlotRender({ id, config, catalog }: { id: string, config: any, cat
           )}
         </div>
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center text-[14px] text-aura-cyan/40 uppercase tracking-widest font-bold">
-          [ ESPACIO DISPONIBLE: {id} ]
+        <div className="absolute inset-0 flex items-center justify-center text-[10px] text-aura-green/20 uppercase tracking-widest font-bold">
+          VACÍO [{id}]
         </div>
       )}
     </div>
@@ -107,69 +69,62 @@ function KioskSlotRender({ id, config, catalog }: { id: string, config: any, cat
 
 export default function APUnit() {
   const [deviceId, setDeviceId] = useState<string | null>(null);
-  const [deviceName, setDeviceName] = useState<string>('UNIT_UNKNOWN');
   const [status, setStatus] = useState('connecting');
   const [errorMsg, setErrorMsg] = useState('');
   
+  // 🚀 DATOS LOCALES EXTRAÍDOS DEL JSONB DEL CREATIVE LAB
   const [recipePages, setRecipePages] = useState<any[]>([]);
   const [recipeCatalog, setRecipeCatalog] = useState<any[]>([]);
   const [currentPageIdx, setCurrentPageIdx] = useState(0);
 
   const activeIdRef = useRef<string | null>(null);
   const isStreamingRef = useRef<boolean>(false);
-  
-  /* * SYS.CORE: TIMING ENGINE
-   * El sistema cicla las páginas de la receta activa a un intervalo regular.
-   */
+
+  // 🚀 CARRUSEL AUTOMÁTICO INDUSTRIAL: Rota las páginas del menú si hay más de una
   useEffect(() => {
     if (recipePages.length <= 1) return;
+    
     const interval = setInterval(() => {
       setCurrentPageIdx(prev => (prev + 1) % recipePages.length);
-    }, 6000); 
+    }, 6000); // Cambia de página cada 6 segundos
+
     return () => clearInterval(interval);
   }, [recipePages]);
-
-  /* * SYS.CORE: PAYLOAD PARSER
-   * El sistema decodifica instrucciones en formato JSON para convertirlas en estado reactivo.
-   */
-  const parseAndSetRecipe = (rawRecipe: any) => {
-    try {
-      let payload = rawRecipe;
-      if (typeof payload === 'string') payload = JSON.parse(payload);
-      
-      const pagesToLoad = Array.isArray(payload) ? payload : (payload?.pages || []);
-      const catalogToLoad = Array.isArray(payload) ? [] : (payload?.catalog || []);
-
-      if (pagesToLoad && pagesToLoad.length > 0) {
-        setRecipePages(pagesToLoad);
-        setRecipeCatalog(catalogToLoad);
-        setCurrentPageIdx(0);
-      }
-    } catch (e) {
-      console.error("Error procesando payload de receta:", e);
-    }
-  };
 
   useEffect(() => {
     let isMounted = true;
     let channel: any = null;
     let telemetryInterval: any = null;
 
-    /* * SYS.BOOT: INICIALIZACIÓN ESTRICTA DE HARDWARE
-     * El sistema requiere un ID explícito en la URL para validar la identidad de la unidad.
-     * Previene la creación de las unidades fantasma y bloquea intentos de acceso no autorizados.
-     */
     const initializeDevice = async () => {
       const params = new URLSearchParams(window.location.search);
       const currentMode = params.get('mode');
-      const currentId = params.get('id');
-      const paramEstId = params.get('est'); 
+      let currentId = params.get('id');
 
-      if (currentMode !== 'apunit') return; 
+      if (currentId && currentMode !== 'apunit') {
+        return; 
+      }
 
-      if (!currentId || !paramEstId) {
-        if (isMounted) setErrorMsg("ACCESS_DENIED: MISSING_HARDWARE_CREDENTIALS");
-        return;
+      if (!currentId) {
+        localStorage.removeItem('aura_active_units');
+        const activeTabs = JSON.parse(localStorage.getItem('aura_active_units') || '[]');
+
+        const { data } = await supabase
+          .from('devices')
+          .select('id')
+          .in('status', ['provisioned', 'offline', 'online', 'running'])
+          .not('id', 'in', `(${activeTabs.join(',') || '00000000-0000-0000-0000-000000000000'})`)
+          .limit(1)
+          .maybeSingle();
+
+        if (!data) {
+          if (isMounted) setErrorMsg("NO_HARDWARE_FOUND_IN_DB");
+          return;
+        }
+        
+        currentId = data.id;
+        activeTabs.push(currentId);
+        localStorage.setItem('aura_active_units', JSON.stringify(activeTabs));
       }
 
       if (!isMounted) return;
@@ -177,23 +132,25 @@ export default function APUnit() {
       activeIdRef.current = currentId;
       setDeviceId(currentId);
 
-      // El sistema sincroniza su estado a ONLINE solo si el registro existe en la base de datos.
+      // Seteamos la placa online y descargamos receta si ya existe en la DB
       const { data: currentDeviceState, error: updateError } = await supabase
         .from('devices')
         .update({ status: 'online', last_heartbeat: new Date().toISOString() })
         .eq('id', currentId)
-        .eq('establishment_id', paramEstId) // Filtro de seguridad dual
-        .select('status, is_mirroring_active, current_recipe, name')
+        .select('status, is_mirroring_active, current_recipe')
         .maybeSingle();
 
-      if (updateError || !currentDeviceState) {
-        if (isMounted) setErrorMsg("CONNECTION_REJECTED: UNREGISTERED_APUnits");
+      if (updateError) {
+        if (isMounted) setErrorMsg("CONNECTION_REJECTED");
         return;
       } else {
         if (isMounted) {
           const deviceData = currentDeviceState as any;
-          if (deviceData?.name) setDeviceName(deviceData.name);
-          if (deviceData?.current_recipe) parseAndSetRecipe(deviceData.current_recipe);
+          
+          // Procesar receta inicial si existe
+          if (deviceData?.current_recipe) {
+            parseAndSetRecipe(deviceData.current_recipe);
+          }
 
           if (deviceData?.status === 'running') {
             isStreamingRef.current = true;
@@ -204,13 +161,13 @@ export default function APUnit() {
         }
       }
 
-      /* * SYS.TELEMETRY: MOTOR DE DIAGNÓSTICO
-       * El sistema envía un pulso de vida a la base de datos cada 5 segundos.
-       */
+      // MOTOR DE TELEMETRÍA (Raspberry Pi Zero 2W background logs)
+      let tick = 0;
       telemetryInterval = setInterval(async () => {
         if (!isMounted || !currentId) return;
         
-        const simulatedTemp = parseFloat((42 + Math.sin(Date.now() * 0.0001) * 4 + Math.random() * 0.5).toFixed(2));
+        tick++;
+        const simulatedTemp = parseFloat((42 + Math.sin(tick * 0.1) * 4 + Math.random() * 0.5).toFixed(2));
         const simulatedVolt = parseFloat((5.05 + Math.random() * 0.08).toFixed(2));
         const simulatedFps = parseFloat((59.85 + Math.random() * 0.3).toFixed(2));
         const simulatedRssi = Math.floor(85 + Math.random() * 15);
@@ -219,21 +176,20 @@ export default function APUnit() {
           .from('device_telemetry')
           .upsert({
             device_id: currentId,
-            mode: isStreamingRef.current ? 'DIAGNOSTIC' : 'MEDIA_PLAYER',
+            mode: recipePages.length > 0 ? 'MEDIA_PLAYER' : 'DIAGNOSTIC',
             state: 'RUNNING',
-            current_item: isStreamingRef.current ? 'Streaming Dashboard Telemetry' : 'Rendering Promo Engine',
-            runtime_seconds: Math.floor(performance.now() / 1000),
+            current_item: recipePages.length > 0 ? 'Rendering Creative Lab Recipe' : 'Hardware Standby',
+            runtime_seconds: tick * 5,
             cpu_temp: simulatedTemp,
             sys_volt: simulatedVolt,
             fps: simulatedFps,
             wifi_signal: simulatedRssi,
-            components: [{ id: 'sys', type: 'text', label: 'DISPLAY_ENGINE', value: 'ACTIVE' }]
+            components: [{ id: 'sys', type: 'text', label: 'KIOSK_ENGINE', value: 'OPERATIONAL' }]
           });
+
       }, 5000);
 
-      /* * SYS.NETWORK: PROTOCOLO WEBSOCKET REALTIME
-       * El sistema se suscribe a un canal privado de Supabase para recibir actualizaciones de estado y recetas al instante.
-       */
+      // ESCUCHADOR REALTIME SCADA (Detecta actualizaciones instantáneas del Orchester)
       if (isMounted && currentId) {
         channel = supabase
           .channel(`unit-uplink-${currentId}`)
@@ -255,7 +211,6 @@ export default function APUnit() {
                 isStreamingRef.current = true;
                 setStatus('running');
               } else {
-                isStreamingRef.current = false;
                 setStatus(target.current_recipe ? 'promo' : 'online');
               }
             }
@@ -267,55 +222,77 @@ export default function APUnit() {
 
     initializeDevice();
 
-    /* * SYS.CLEANUP: SHUTDOWN PROTOCOL
-     * El sistema purga canales abiertos y actualiza el estado a OFFLINE antes de la terminación.
-     */
     return () => { 
       isMounted = false; 
       if (telemetryInterval) clearInterval(telemetryInterval);
       const idToShutdown = activeIdRef.current;
       
       if (idToShutdown) {
+        const activeTabs = JSON.parse(localStorage.getItem('aura_active_units') || '[]');
+        const updatedTabs = activeTabs.filter((id: string) => id !== idToShutdown);
+        localStorage.setItem('aura_active_units', JSON.stringify(updatedTabs));
+
         supabase.from('device_telemetry').delete().eq('device_id', idToShutdown).then(() => {
           supabase
             .from('devices')
-            .update({ status: 'offline', last_heartbeat: new Date().toISOString() })
+            .update({ status: 'offline', current_recipe: null, last_heartbeat: new Date().toISOString() })
             .eq('id', idToShutdown);
         });
       }
+
       if (channel) supabase.removeChannel(channel); 
     };
-  }, []); 
+  }, [recipePages.length]);
 
-  // --- VISTAS DE ESTADO DEL KIOSKO ---
+  // Auxiliar para desempaquetar la receta de la DB de manera segura
+  const parseAndSetRecipe = (rawRecipe: any) => {
+    try {
+      let payload = rawRecipe;
+      if (typeof payload === 'string') {
+        payload = JSON.parse(payload);
+      }
+      if (payload && payload.pages) {
+        setRecipePages(payload.pages);
+        setRecipeCatalog(payload.catalog || []);
+        setCurrentPageIdx(0);
+      }
+    } catch (e) {
+      console.error("Error parseando receta en APUnit:", e);
+    }
+  };
 
-  if (errorMsg) return <div className="h-screen flex items-center justify-center bg-black p-10 text-red-500 font-mono text-xl">SYS.ERROR: {errorMsg}</div>;
-  if (!deviceId) return <div className="h-screen flex items-center justify-center bg-black p-10 text-aura-cyan font-mono animate-pulse text-xl">BOOTING_KIOSK_OS...</div>;
+  if (errorMsg) return <div className="h-screen flex items-center justify-center bg-black p-10 text-red-500 font-mono text-xl">ERROR: {errorMsg}</div>;
+  if (!deviceId) return <div className="h-screen flex items-center justify-center bg-black p-10 text-aura-cyan font-mono animate-pulse text-xl">INITIALIZING_HARDWARE...</div>;
 
+  // 🚀 CONTROL DE RENDERIZADO VISUAL SEGÚN EL ESTADO REAL DE LA UNIDAD
+  
+  // MODO A: Admin Mirroring / Diagnostics activo (Look terminal de control)
   if (status === 'running') {
     return (
       <div className="h-screen w-screen bg-cyan-950 text-aura-cyan flex flex-col items-center justify-center font-mono p-10 border-[16px] border-aura-dark shadow-[inset_0_0_60px_rgba(0,243,255,0.15)]">
         <Cpu size={80} className="mb-6 text-aura-cyan animate-spin" style={{ animationDuration: '12s' }} />
-        <h1 className="text-xl font-bold tracking-[0.3em] uppercase">AP-UNIT // SCADA_MODE</h1>
-        <div className="text-[11px] opacity-40 mt-1">UUID: {deviceId}</div>
+        <h1 className="text-xl font-bold tracking-[0.3em] uppercase">AP-UNIT // ADMIN_MODE</h1>
+        <div className="text-[11px] opacity-40 mt-1 select-all">UUID: {deviceId}</div>
         <div className="mt-8 flex flex-col items-center gap-2">
           <Activity className="animate-pulse text-aura-cyan" size={32} />
-          <span className="text-2xl font-black tracking-widest">TRANSMITTING TELEMETRY</span>
+          <span className="text-2xl font-black tracking-widest uppercase">STREAMING TELEMETRY</span>
         </div>
       </div>
     );
   }
 
+  // MODO B: SEÑALIZACIÓN DIGITAL PROMO ACTIVA (Renderiza el layout del Creative Lab)
   if (recipePages.length > 0 && recipePages[currentPageIdx]) {
     const activePage = recipePages[currentPageIdx];
-
+    
     return (
-      <div className="h-screen w-screen bg-black text-white overflow-hidden flex flex-col relative p-4 select-none">
-        <div className="absolute top-3 left-4 text-[11px] font-mono text-aura-cyan font-bold tracking-widest z-50 bg-black/60 px-3 py-1.5 border border-aura-cyan/30 shadow-[0_0_10px_rgba(0,0,0,0.8)] backdrop-blur-sm flex items-center gap-2">
-          <span className="w-2 h-2 bg-aura-cyan rounded-full animate-pulse"></span>
-          AURA-NET // {deviceName !== 'UNIT_UNKNOWN' ? deviceName.toUpperCase() : 'AP-UNIT'} [ ID: {deviceId?.split('-')[0]} ] // PAGE {currentPageIdx + 1} OF {recipePages.length}
+      <div className="h-screen w-screen bg-black text-white overflow-hidden flex flex-col relative p-4">
+        {/* Línea sutil cyberpunk superior indicando red Aura */}
+        <div className="absolute top-1 left-4 text-[9px] font-mono opacity-20 tracking-widest z-50">
+          AURA-NET // DISPLAY_MODE: PROMO_SCRIPT // PAGE {currentPageIdx + 1} OF {recipePages.length}
         </div>
         
+        {/* Motor de inyección de rejillas responsivas idénticas a la previsualización */}
         <div className="flex-1 w-full h-full p-2">
           {activePage.layout === 'full' && (
             <KioskSlotRender id="slot-0" catalog={recipeCatalog} config={activePage.slots['slot-0']} />
@@ -342,6 +319,7 @@ export default function APUnit() {
     );
   }
 
+  // MODO C: Standby Standard (Esperando campaña)
   return (
     <div className="h-screen w-screen bg-black text-green-500 flex flex-col items-center justify-center font-mono p-10 border-[16px] border-aura-dark">
       <Cpu size={80} className="mb-6 text-green-500 animate-bounce" style={{ animationDuration: '4s' }} />
@@ -350,7 +328,7 @@ export default function APUnit() {
       <div className="flex flex-col items-center gap-4">
         <Activity className="animate-pulse text-green-500" size={40} />
         <span className="text-4xl font-black uppercase tracking-widest animate-pulse">ONLINE</span>
-        <span className="text-[10px] text-center text-neutral-600 tracking-wider max-w-sm mt-2">
+        <span className="text-[10px] text-center text-neutral-500 tracking-wider max-w-sm mt-2">
           MÓDULO EN ESPERA — CONFIGURACIÓN VACÍA. INYECTA UN SCRIPT DESDE EL ORCHESTER CENTER PARA TRANSMITIR...
         </span>
       </div>
