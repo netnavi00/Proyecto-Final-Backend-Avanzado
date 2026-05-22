@@ -156,8 +156,8 @@ export default function APUnit() {
     let telemetryInterval: any = null;
 
     /* * SYS.BOOT: INICIALIZACIÓN ESTRICTA DE HARDWARE
-     * El sistema requiere un ID explícito en la URL para validar la identidad del nodo.
-     * Previene la creación de nodos fantasma y bloquea intentos de acceso no autorizados.
+     * El sistema requiere un ID explícito en la URL para validar la identidad de la unidad.
+     * Previene la creación de las unidades fantasma y bloquea intentos de acceso no autorizados.
      */
     const initializeDevice = async () => {
       const params = new URLSearchParams(window.location.search);
@@ -187,7 +187,7 @@ export default function APUnit() {
         .maybeSingle();
 
       if (updateError || !currentDeviceState) {
-        if (isMounted) setErrorMsg("CONNECTION_REJECTED: UNREGISTERED_NODE");
+        if (isMounted) setErrorMsg("CONNECTION_REJECTED: UNREGISTERED_APUnits");
         return;
       } else {
         if (isMounted) {

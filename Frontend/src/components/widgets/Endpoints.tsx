@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase'; 
-import { Database, Plus, RefreshCw, Trash2, Edit3, Terminal, Code } from 'lucide-react';
+import { Database, Plus, RefreshCw, Trash2, Edit3, Terminal, Code, BookOpen, TriangleAlert } from 'lucide-react';
 
 interface LogEntry {
   timestamp: string;
@@ -14,22 +14,35 @@ export function Endpoints() {
   const [tableName, setTableName] = useState('devices');
   const [primaryId, setPrimaryId] = useState('');
   
-  // 📝 UN SÓLO INPUT PARA TODO: Payload JSON crudo
+  const [availableTables, setAvailableTables] = useState<string[]>([
+    'devices', 'establishments', 'profiles', 'device_telemetry', 'staff'
+  ]);
+  const [showManual, setShowManual] = useState(false);
   const [rawJson, setRawJson] = useState('{\n  "columna": "valor"\n}');
+
+  // Motor de Auto-Detección de Tablas
+  useEffect(() => {
+    const scanDatabase = async () => {
+      const { data, error } = await supabase.rpc('get_all_tables');
+      if (!error && data) {
+        setAvailableTables(data);
+      }
+    };
+    scanDatabase();
+  }, []);
 
   const addLog = (message: string, data?: any, type: 'success' | 'error' | 'info' | 'action' = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
     setLogs(prev => [{ timestamp, message, data, type }, ...prev]);
   };
 
-  // Plantillas rápidas para facilitarte la vida al cambiar de tabla
   const handleTablePreset = (table: string) => {
     setTableName(table);
     setPrimaryId('');
     if (table === 'devices') {
-      setRawJson('{\n  "id": "UUID_DEL_DISPOSITIVO",\n  "establishment_id": "UUID_DEL_LOCAL"\n}');
+      setRawJson('{\n  "name": "NODO-TERRAZA",\n  "status": "offline",\n  "establishment_id": "UUID_DEL_LOCAL"\n}');
     } else if (table === 'establishments') {
-      setRawJson('{\n  "name": "NUEVO_LOCAL",\n  "owner_id": "UUID_DEL_DUEÑO",\n  "tier": "BASIC"\n}');
+      setRawJson('{\n  "name": "Cyber Bar VIP",\n  "tier": "PREMIUM",\n  "owner_id": "UUID_DEL_DUEÑO"\n}');
     } else if (table === 'profiles') {
       setRawJson('{\n  "id": "UUID_AUTH",\n  "full_name": "NOMBRE_COMPLETO",\n  "role": "admin"\n}');
     } else {
@@ -38,7 +51,6 @@ export function Endpoints() {
     addLog(`🔄 TARGET_CHANGED: Apuntando a [${table.toUpperCase()}]`);
   };
 
-  // Validador y parseador de JSON incorporado
   const parsePayload = (): any | null => {
     try {
       return JSON.parse(rawJson);
@@ -50,7 +62,7 @@ export function Endpoints() {
   };
 
   /* ==========================================
-     CRUD UNIVERSAL (No importa qué columnas tengas)
+     CRUD UNIVERSAL
      ========================================== */
 
   const handleRead = async () => {
@@ -118,21 +130,83 @@ export function Endpoints() {
           <Database size={13} className="text-aura-cyan" />
           <span className="text-zinc-400 font-bold uppercase">Tabla_Destino:</span>
         </div>
-        <div className="flex gap-2">
-          {/* Accesos rápidos */}
-          <button onClick={() => handleTablePreset('devices')} type="button" className={`px-2 py-1 text-[10px] border ${tableName === 'devices' ? 'bg-aura-cyan/20 border-aura-cyan text-aura-cyan' : 'border-zinc-800 text-zinc-500'}`}>DEVICES</button>
-          <button onClick={() => handleTablePreset('establishments')} type="button" className={`px-2 py-1 text-[10px] border ${tableName === 'establishments' ? 'bg-aura-cyan/20 border-aura-cyan text-aura-cyan' : 'border-zinc-800 text-zinc-500'}`}>ESTABLISHMENTS</button>
-          <button onClick={() => handleTablePreset('profiles')} type="button" className={`px-2 py-1 text-[10px] border ${tableName === 'profiles' ? 'bg-aura-cyan/20 border-aura-cyan text-aura-cyan' : 'border-zinc-800 text-zinc-500'}`}>PROFILES</button>
-          
-          {/* Input manual por si creas una tabla nueva en el futuro */}
+        <div className="flex gap-2 items-center">
+          <select 
+            value={availableTables.includes(tableName) ? tableName : ''}
+            onChange={(e) => {
+              if(e.target.value) handleTablePreset(e.target.value);
+            }}
+            className="bg-black border border-zinc-700 text-aura-cyan px-2 py-1 text-[11px] outline-none focus:border-aura-cyan font-bold uppercase cursor-pointer"
+          >
+            <option value="" disabled>-- SELECCIONA TABLA --</option>
+            {availableTables.map(table => (
+              <option key={table} value={table}>{table}</option>
+            ))}
+          </select>
+          <span className="text-zinc-600">/</span>
           <input 
             value={tableName} 
             onChange={(e) => setTableName(e.target.value.toLowerCase())}
             placeholder="Otra tabla..."
-            className="bg-black border border-zinc-700 text-white px-2 py-0.5 text-[11px] w-28 outline-none focus:border-aura-cyan font-bold"
+            className="bg-black border border-zinc-700 text-white px-2 py-1 text-[11px] w-28 outline-none focus:border-aura-cyan font-bold"
           />
         </div>
       </div>
+
+      {/* BOTÓN TOGGLE MANUAL */}
+      <div className="flex justify-end -mt-2">
+        <button 
+          onClick={() => setShowManual(!showManual)}
+          className="flex items-center gap-1.5 text-[10px] font-bold text-aura-cyan hover:text-black transition-colors bg-aura-cyan/10 hover:bg-aura-cyan px-2 py-1 border border-aura-cyan/30"
+        >
+          <BookOpen size={12} />
+          {showManual ? '[X] CERRAR_MANUAL' : '[?] LEER_MANUAL_OPERADOR'}
+        </button>
+      </div>
+
+      {/* PANEL DEL MANUAL CON EJEMPLOS DE PAYLOADS */}
+      {showManual && (
+        <div className="bg-zinc-950 border border-zinc-800 p-4 text-[10.5px] text-zinc-400 space-y-4 shadow-lg mb-4">
+          <h3 className="text-white font-bold tracking-widest border-b border-zinc-800 pb-1 flex items-center gap-2">
+            <TriangleAlert size={14} className="text-amber-500" /> OPERATOR MANUAL & RAW PAYLOAD TEMPLATES
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <p><strong className="text-purple-400">[GET] LISTAR:</strong> Descarga todos los registros de la tabla destino. <br/><span className="text-zinc-500">Ignora el UUID y el Payload JSON.</span></p>
+              <p><strong className="text-emerald-400">[POST] INSERTAR:</strong> Inyecta un nuevo registro. <br/><span className="text-zinc-500">Requiere un JSON Payload válido. Ignora el campo UUID (Supabase lo auto-genera).</span></p>
+            </div>
+            <div className="space-y-2">
+              <p><strong className="text-amber-400">[PATCH] ACTUALIZAR:</strong> Modifica un registro existente. <br/><span className="text-zinc-500"><strong>Obligatorio:</strong> Ingresar el UUID en "Target_Record_ID" y solo los campos a cambiar en el JSON Payload.</span></p>
+              <p><strong className="text-red-400">[DELETE] PURGAR:</strong> Elimina un registro permanentemente. <br/><span className="text-zinc-500"><strong>Obligatorio:</strong> Ingresar el UUID en "Target_Record_ID". Ignora el Payload JSON.</span></p>
+            </div>
+          </div>
+
+          {/* SECCIÓN DE PLANTILLAS RAPIDAS */}
+          <div className="border-t border-zinc-900 pt-3 space-y-2">
+            <span className="text-zinc-300 font-bold block uppercase tracking-wider">📋 Ejemplos Estrictos para copiar (POST / PATCH):</span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 font-mono text-[10px]">
+              <div className="bg-black p-2 border border-zinc-800">
+                <span className="text-aura-cyan block mb-1">// Tabla: devices</span>
+                <pre className="text-emerald-500">{"{\n  \"name\": \"NODO-BARRA\",\n  \"status\": \"offline\",\n  \"establishment_id\": \"UUID_AQUI\"\n}"}</pre>
+              </div>
+              <div className="bg-black p-2 border border-zinc-800">
+                <span className="text-aura-cyan block mb-1">// Tabla: establishments</span>
+                <pre className="text-emerald-500">{"{\n  \"name\": \"Cyber Bar X\",\n  \"tier\": \"PREMIUM\",\n  \"owner_id\": \"UUID_AQUI\"\n}"}</pre>
+              </div>
+              <div className="bg-black p-2 border border-zinc-800">
+                <span className="text-aura-cyan block mb-1">// Inserción Múltiple (Array)</span>
+                <pre className="text-emerald-500">{"[\n  { \"name\": \"MESA-1\" },\n  { \"name\": \"MESA-2\" }\n]"}</pre>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-black p-2 border border-zinc-800 flex items-start gap-2 mt-2">
+            <span className="text-red-500 font-bold">⚠️ REGLA CRÍTICA SINTAXIS:</span>
+            <span>Las claves (columnas) y los valores de texto <strong>deben usar comillas dobles obligatoriamente</strong>. Evita dejar comas colgantes al final del último parámetro.</span>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         
@@ -140,7 +214,7 @@ export function Endpoints() {
         <div className="space-y-3">
           <form onSubmit={handleCreate} className="space-y-3 bg-zinc-950 p-3.5 border border-zinc-800">
             
-            {/* ID FILTRO (Para Read específico, Updates y Deletes) */}
+            {/* ID FILTRO */}
             <div>
               <label className="text-[9px] text-zinc-500 uppercase block mb-0.5 font-bold">Target_Record_ID (UUID para PATCH / DELETE)</label>
               <input 
@@ -150,7 +224,7 @@ export function Endpoints() {
               />
             </div>
 
-            {/* CAJA DE TEXTO PARA EL PAYLOAD JSON LIBRE */}
+            {/* CAJA DE TEXTO PAYLOAD JSON */}
             <div>
               <label className="text-[9px] text-aura-cyan uppercase block mb-1 font-bold flex items-center gap-1">
                 <Code size={11}/> Raw_Payload_JSON (Campos libres)

@@ -79,7 +79,7 @@ export function TacticalGrid({
       .from('layout_elements')
       .select('*')
       .eq('establishment_id', establishmentId)
-      .order('created_at', { ascending: true }); // Mantiene el orden de creación en el grid
+      .order('created_at', { ascending: true }); 
     
     if (!error && data) {
       setLayoutElements(data);
@@ -100,7 +100,7 @@ export function TacticalGrid({
     return () => { supabase.removeChannel(channel); };
   }, [establishmentId]);
 
-  // 🚀 REALTIME: Suscripción al nuevo canal de telemetría
+  // REALTIME: Suscripción al nuevo canal de telemetría
   useEffect(() => {
     if (!selectedTableId) {
       setLiveTelemetry(null);
@@ -163,7 +163,7 @@ export function TacticalGrid({
     return () => { supabase.removeChannel(telemetryChannel); };
   }, [selectedTableId]);
 
-  // Agregar mueble arquitectónico (Ahora se apilará automáticamente en el Grid)
+  // Agregar mueble arquitectónico, Ahora se apilará automáticamente en el Grid
   const handleAddLayoutElement = async (type: 'mesa' | 'barra') => {
     if (!establishmentId) return;
     
@@ -355,7 +355,7 @@ export function TacticalGrid({
         </div>
       </div>
 
-      {/* 🌌 CAPA REAL: VIEWPORT DEL MAPA (AHORA UN CSS GRID) */}
+      {/* 🌌 CAPA REAL: VIEWPORT DEL MAPA  */}
       <div 
         ref={constraintsRef} 
         className="flex-1 overflow-auto select-none rounded-lg border-2 border-aura-dark bg-aura-black/50"
@@ -366,7 +366,7 @@ export function TacticalGrid({
       >
         <div style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left', minWidth: '100%', minHeight: '100%' }} className="p-8">
           
-          {/* 🚀 CSS GRID MATRIX: Auto-acomodo de estructuras */}
+          {/* CSS GRID MATRIX: Auto-acomodo de estructuras */}
           <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-6 w-full">
             
             {layoutElements.map(element => {
@@ -384,7 +384,7 @@ export function TacticalGrid({
                   onDrop={(e) => handleMesaDrop(e, element.id)}
                   style={{ minHeight: element.height }}
                   className={`relative p-3 rounded-lg border-2 bg-aura-bg/90 backdrop-blur-sm group flex flex-col justify-between z-10 transition-colors duration-200 ${isDraggingOverMe ? 'border-aura-cyan bg-aura-cyan/20 scale-[1.03] shadow-[0_0_25px_rgba(0,255,242,0.3)]' : isBarra ? 'border-purple-600/50 shadow-[0_0_15px_rgba(168,85,247,0.05)]' : 'border-aura-green/40'}`}
-                >
+                 >
                   {/* Botonera de Control del mueble */}
                   <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity z-30">
                     <button 
@@ -415,32 +415,44 @@ export function TacticalGrid({
                   </div>
 
                   {/* Espacio del AP-Unit dentro de la mesa */}
-                  <div className="flex-1 flex items-center justify-center border border-dashed border-aura-dark/60 rounded bg-aura-black/60 p-1.5 w-full">
+                  <div className="w-full h-full flex flex-col p-1.5">
                     {dockedDevice ? (
                       <div 
                         onClick={e => { e.stopPropagation(); onTableSelect(dockedDevice.id); }}
-                        className={`w-full h-full flex items-center justify-between px-3 bg-aura-panel border text-[11px] font-bold text-white rounded cursor-pointer hover:brightness-125 transition-all relative group/unit ${selectedTableId === dockedDevice.id ? 'border-aura-cyan shadow-[0_0_12px_rgba(0,255,242,0.4)] bg-aura-cyan/10' : 'border-aura-cyan/50'}`}
+                        className={`w-full h-full flex flex-col border rounded cursor-pointer transition-all relative group/unit ${
+                          selectedTableId === dockedDevice.id 
+                            ? 'border-aura-cyan shadow-[0_0_12px_rgba(0,255,242,0.4)] bg-aura-cyan/10' 
+                            : 'border-aura-cyan/50 bg-aura-panel'
+                        }`}
                       >
-                        <div className="flex items-center gap-2 truncate max-w-[70%]">
-                          <Tv size={12} className={dockedDevice.status === 'online' ? "text-aura-green" : "text-slate-500"} />
-                          <span className="truncate">{dockedDevice.name}</span>
+                        {/* 1. SECCIÓN SUPERIOR: Icono (Izquierda) y Status (Derecha) */}
+                        <div className="flex justify-between items-start w-full px-2 pt-2">
+                          <Tv size={14} className={dockedDevice.status === 'online' ? "text-aura-green" : "text-slate-500"} />
+                          <span className={`w-2 h-2 rounded-full ${dockedDevice.status === 'online' ? 'bg-aura-green shadow-[0_0_8px_#00ff66]' : 'bg-red-500'}`} />
+                        </div>
+
+                        {/* 2. SECCIÓN CENTRAL/INFERIOR: Nombre centrado */}
+                        <div className="flex-1 flex items-center justify-center w-full px-1">
+                          <span className="text-[9px] font-bold text-white uppercase truncate w-full text-center">
+                            {dockedDevice.name}
+                          </span>
                         </div>
                         
                         {/* Botón X de desacople */}
                         <button 
                           onClick={e => { e.stopPropagation(); handleUnlinkDevice(dockedDevice.id); }}
-                          className="absolute -top-1.5 -right-1.5 p-1 bg-aura-black border border-aura-cyan text-aura-cyan rounded-full opacity-0 group-hover/unit:opacity-100 hover:bg-aura-cyan hover:text-black transition-all z-40 scale-90 shadow-md"
+                          className="absolute -top-1.5 -right-1.5 p-1 bg-aura-black border border-aura-cyan text-aura-cyan rounded-full opacity-0 group-hover/unit:opacity-100 hover:bg-aura-cyan hover:text-black transition-all z-40 shadow-md"
                           title="Desacoplar unidad"
                         >
                           <X size={10} />
                         </button>
-
-                        <span className={`w-2 h-2 rounded-full ${dockedDevice.status === 'online' ? 'bg-aura-green shadow-[0_0_8px_#00ff66]' : 'bg-red-500'} group-hover/unit:opacity-0 transition-opacity`} />
                       </div>
                     ) : (
-                      <span className="text-[10px] uppercase tracking-widest opacity-30 font-mono text-center w-full">
-                        {isDraggingOverMe ? "¡Suelta Aquí!" : "Slot Libre"}
-                      </span>
+                      <div className="w-full h-full flex items-center justify-center border border-dashed border-aura-dark/60 rounded bg-aura-black/60">
+                        <span className="text-[9px] uppercase tracking-widest opacity-30 font-mono text-center">
+                          {isDraggingOverMe ? "¡Suelta Aquí!" : "Slot Libre"}
+                        </span>
+                      </div>
                     )}
                   </div>
                 </motion.div>

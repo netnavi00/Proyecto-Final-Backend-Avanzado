@@ -14,7 +14,7 @@ export const LogoutButton = ({ onLogout }: LogoutButtonProps) => {
       if (error) throw error;
       
       console.log("SESSION_TERMINATED: Connection closed safely.");
-      onLogout(); // Esto limpia el estado en tu App.tsx
+      onLogout(); 
     } catch (err) {
       console.error("Error during session termination:", err);
     }

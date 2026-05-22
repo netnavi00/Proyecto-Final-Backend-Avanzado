@@ -116,14 +116,14 @@ export default function App() {
   
   useEffect(() => {
   const autoConnect = async () => {
-    // 1. Buscamos todas las unidades que están 'online' pero no tienen receta
+    // 1. Busca todas las unidades que están 'online' pero no tienen receta
     const { data: onlineUnits } = await supabase
       .from('devices')
       .select('id')
       .eq('status', 'online');
 
-    // 2. Si hay unidades listas, les asignamos un estado de "pre-ready"
-    // o simplemente forzamos un ping de sincronización.
+    // 2. Si hay unidades listas, se asigna un estado de "pre-ready"
+    // o simplemente forzar un ping de sincronización.
     if (onlineUnits && onlineUnits.length > 0) {
       console.log("📡 Unidades detectadas, sincronizando...");
       // Aquí puedes disparar una función que despierte a las unidades
@@ -167,7 +167,7 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // --- SUSCRIPCIÓN DEDICADA REALTIME TELEMETRÍA (VERSION BLINDADA) ---
+  // --- SUSCRIPCIÓN DEDICADA REALTIME TELEMETRÍA ---
   useEffect(() => {
     let isMounted = true; 
     let channel: any = null;
@@ -613,11 +613,11 @@ function LiveMirrorDrawer({ table, staff, onClose, onRename, liveTelemetry }: an
   const handlePlayCommand = async () => {
     console.log(`📡 Despachando comando de transmisión remota al nodo: ${table.id}`);
     
-    // 1. Forzamos la apertura de la ventana simuladora apuntando a la raíz con queries limpios
+    // 1. Forzar la apertura de la ventana simuladora apuntando a la raíz con queries limpios
     const targetUrl = `${window.location.origin}/?mode=apunit&id=${table.id}`;
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
 
-    // 2. Propagamos el cambio de estado a la base de datos para encender el motor síncrono
+    // 2. Propagarel cambio de estado a la base de datos para encender el motor síncrono
     await supabase
       .from('devices')
       .update({ 
@@ -628,7 +628,7 @@ function LiveMirrorDrawer({ table, staff, onClose, onRename, liveTelemetry }: an
       .eq('id', table.id);
   };
 
-    {/* PEQUEÑA BARRA DE DIAGNÓSTICO ELÉCTRICO (CORREGIDA) */}
+    {/* PEQUEÑA BARRA DE DIAGNÓSTICO ELÉCTRICO  */}
         {liveTelemetry && (
           <div className="mt-2 text-[10px] flex justify-between uppercase tracking-widest px-1 font-bold">
             <span className={liveTelemetry.sys_volt < 5.0 ? 'text-aura-red animate-pulse' : 'text-aura-cyan'}>
@@ -699,7 +699,7 @@ function LiveMirrorDrawer({ table, staff, onClose, onRename, liveTelemetry }: an
           )}
         </div>
         
-        {/* PEQUEÑA BARRA DE DIAGNÓSTICO ELÉCTRICO (CORREGIDA) */}
+        {/* PEQUEÑA BARRA DE DIAGNÓSTICO ELÉCTRICO  */}
         {liveTelemetry && (
           <div className="mt-2 text-[10px] flex justify-between uppercase tracking-widest px-1 font-bold">
             <span className={liveTelemetry.sys_volt < 5.0 ? 'text-aura-red animate-pulse' : 'text-aura-cyan'}>

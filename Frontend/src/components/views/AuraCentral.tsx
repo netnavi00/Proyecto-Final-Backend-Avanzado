@@ -144,7 +144,7 @@ export function AuraCentral() {
         </div>
       </div>
 
-      {/* SECCIÓN 1: ENTIDADES (CON RASTREO FINANCIERO/TIER - ITERA CON 'p') */}
+      {/* SECCIÓN 1: ENTIDADES (CON RASTREO FINANCIERO/TIER ) */}
       <div className="space-y-4">
         <SectionTitle>User Role Management</SectionTitle>
         <div className="border-2 border-[#a855f7]/20 bg-aura-black/40 overflow-x-auto font-mono text-[13px]">
@@ -273,7 +273,7 @@ export function AuraCentral() {
         </div>
       </div>
 
-      {/* --- SECCIÓN 3: HARDWARE INVENTORY & PROVISIONING (ITERA CON 'd') --- */}
+      {/* --- SECCIÓN 3: HARDWARE INVENTORY & PROVISIONING  --- */}
       <div className="space-y-4 pt-4">
         <SectionTitle>Hardware Inventory & Provisioning</SectionTitle>
         
@@ -359,7 +359,7 @@ export function AuraCentral() {
             ))}
           </div>
 
-          {/* TABLA DE INVENTARIO (CON VARIABLES 'd') */}
+          {/* TABLA DE INVENTARIO */}
           <div className="w-full overflow-x-auto border-2 border-aura-dark bg-aura-black/40 rounded-b-lg rounded-tr-lg">
             <table className="w-full text-left border-collapse font-mono text-[13px]">
               <thead className="bg-white/5 text-[10px] uppercase text-aura-cyan font-black tracking-widest border-b border-aura-dark">

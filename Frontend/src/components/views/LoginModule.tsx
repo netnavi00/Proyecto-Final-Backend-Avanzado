@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'; // 👈 Añadimos useEffect
+import React, { useState, useEffect } from 'react'; 
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, AlertTriangle, ShieldCheck, UserPlus, X, CheckCircle2 } from 'lucide-react';
 import { supabase, SUPABASE_URL } from '../../services/supabase';
@@ -21,7 +21,7 @@ export default function LoginModule({ onLoginSuccess }: LoginModuleProps) {
   const [regError, setRegError] = useState<string | null>(null);
   const [regSuccess, setRegSuccess] = useState(false);
 
-  // 🚀 MOTOR DE RECUPERACIÓN: Detecta si acabamos de sobrevivir a un registro
+  // 🚀 MOTOR DE RECUPERACIÓN: Detecta un registro
   useEffect(() => {
     const pendingSuccess = sessionStorage.getItem('aura_registration_complete');
     if (pendingSuccess === 'true') {
