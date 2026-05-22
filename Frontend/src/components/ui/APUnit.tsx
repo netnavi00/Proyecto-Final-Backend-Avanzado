@@ -96,6 +96,12 @@ export default function APUnit() {
     let channel: any = null;
     let telemetryInterval: any = null;
 
+    // Generador dinámico de formato de catálogo para logs
+    const d = new Date();
+    const day = d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+    const date = d.toISOString().split('T')[0];
+    const trialLabel = `${day}-TRIAL-${date}`;
+
     const initializeDevice = async () => {
       const params = new URLSearchParams(window.location.search);
       const currentMode = params.get('mode');
@@ -128,6 +134,8 @@ export default function APUnit() {
       }
 
       if (!isMounted) return;
+
+      console.log(`[${trialLabel}] RPi Zero 2 W Boot Sequence Initiated... UUID: ${currentId}`);
 
       activeIdRef.current = currentId;
       setDeviceId(currentId);
@@ -178,7 +186,7 @@ export default function APUnit() {
             device_id: currentId,
             mode: recipePages.length > 0 ? 'MEDIA_PLAYER' : 'DIAGNOSTIC',
             state: 'RUNNING',
-            current_item: recipePages.length > 0 ? 'Rendering Creative Lab Recipe' : 'Hardware Standby',
+            current_item: `[${trialLabel}] ${recipePages.length > 0 ? 'Rendering Creative Lab Recipe' : 'Hardware Standby'}`,
             runtime_seconds: tick * 5,
             cpu_temp: simulatedTemp,
             sys_volt: simulatedVolt,
@@ -242,7 +250,7 @@ export default function APUnit() {
 
       if (channel) supabase.removeChannel(channel); 
     };
-  }, [recipePages.length]);
+  }, []); // 🔒 CORREGIDO: Arreglo vacío (Se monta una sola vez)
 
   // Auxiliar para desempaquetar la receta de la DB de manera segura
   const parseAndSetRecipe = (rawRecipe: any) => {
