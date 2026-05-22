@@ -213,14 +213,21 @@ export function CreativeLab() {
   }, []);
 
 
+  // Reacciona y se dispara SOLO cuando ya detectó el ID del local
   useEffect(() => {
-    fetchCampaigns();
-  }, []);
+    if (currentEstablishmentId) {
+      fetchCampaigns();
+    }
+  }, [currentEstablishmentId]);
 
   const fetchCampaigns = async () => {
+    // 2. Seguridad extra: Si no hay ID, no hace la consulta
+    if (!currentEstablishmentId) return; 
+
     const { data, error } = await supabase
       .from('promo_scripts')
       .select('id, name, config_payload')
+      .eq('establishment_id', currentEstablishmentId) // 🔒 EL CANDADO (Filtro Multi-tenant)
       .order('created_at', { ascending: false });
     
     if (!error && data) {
@@ -500,7 +507,7 @@ return (
     <div className="h-full flex flex-col">
       
       {/* ========================================================= */}
-      {/* 1️⃣ HEADER PRINCIPAL: Título, Storage y Guardar            */}
+      /* 1️⃣ HEADER PRINCIPAL: Título, Storage y Guardar            */
       {/* ========================================================= */}
       <div className="flex flex-col xl:flex-row items-start xl:items-center w-full shrink-0 gap-6 mb-[12px]">
         <h2 className="text-[13px] font-bold flex flex-col xl:flex-row items-center w-full shrink-0 gap-4">
@@ -599,15 +606,37 @@ return (
                   <button onClick={() => setCatalogTab('event')} className={`flex-1 py-2 text-[10px] font-bold uppercase transition-colors ${catalogTab === 'event' ? 'bg-purple-500 text-aura-text' : 'border-2 border-aura-dark text-aura-green/40 hover:border-purple-500/50 hover:text-purple-400'}`}>Eventos</button>
                 </div>
                 <div className="flex flex-col gap-[14px]">
-                    {catalog.filter(i => i.type === catalogTab).map(item => (
-                      <div key={item.id} onClick={() => updateSlot({ boundItemId: item.id })} className={`flex items-center gap-[14px] p-[9px] border cursor-pointer transition-colors ${activeSlot?.boundItemId === item.id ? (item.type === 'menu' ? 'border-aura-cyan bg-aura-cyan/10' : 'border-purple-500 bg-purple-500/10') : 'border-aura-dark hover:border-aura-green/50 bg-aura-bg hover:bg-aura-panel'}`}>
-                        <div className="w-12 h-12 bg-cover bg-center border-2 border-aura-dark shrink-0" style={{ backgroundImage: `url(${item.imageUrl})` }} />
-                        <div className="flex flex-col flex-1 overflow-hidden">
-                          <span className="text-[13px] font-bold text-aura-text truncate">{item.name}</span>
-                          {item.type === 'menu' && typeof item.price === 'number' && (<span className="text-[12px] text-aura-green font-mono">${item.price.toFixed(2)}</span>)}
+                    {/* 🚀 INICIO DEL BLOQUE REEMPLAZADO 🚀 */}
+                    {catalog.filter(i => i.type === catalogTab).map(item => {
+                      const isSelected = activeSlot?.boundItemId === item.id;
+                      
+                      return (
+                        <div 
+                          key={item.id} 
+                          onClick={() => updateSlot({ boundItemId: item.id })} 
+                          className={`flex items-center gap-[14px] p-[9px] border cursor-pointer transition-colors ${
+                            isSelected 
+                              ? (item.type === 'menu' ? 'border-aura-cyan bg-aura-cyan/10' : 'border-purple-500 bg-purple-500/10') 
+                              : 'border-aura-dark hover:border-aura-green/50 bg-aura-bg hover:bg-aura-panel'
+                          }`}
+                        >
+                          <div className="w-12 h-12 bg-cover bg-center border-2 border-aura-dark shrink-0" style={{ backgroundImage: `url(${item.imageUrl})` }} />
+                          <div className="flex flex-col flex-1 overflow-hidden">
+                            <span className={`text-[13px] font-bold truncate transition-colors ${
+                              isSelected 
+                                ? (item.type === 'menu' ? 'text-aura-cyan' : 'text-purple-400') 
+                                : 'text-aura-text'
+                            }`}>
+                              {item.name}
+                            </span>
+                            {item.type === 'menu' && typeof item.price === 'number' && (
+                              <span className="text-[12px] text-aura-green font-mono">${item.price.toFixed(2)}</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
+                    {/* 🚀 FIN DEL BLOQUE REEMPLAZADO 🚀 */}
                 </div>
               </div>
             )}
