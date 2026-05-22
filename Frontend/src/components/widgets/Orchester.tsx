@@ -10,24 +10,46 @@ export function Orchester({ tables, winningRatio, setWinningRatio, onFlashAction
   const [targetType, setTargetType] = useState<'All' | 'Zone' | 'Individual'>('All');
   const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
   const [slides, setSlides] = useState<string[]>(['', '', '', '']);
+  const [currentEstablishmentId, setCurrentEstablishmentId] = useState<string>('');
 
   // 🚀 ESTADOS PARA EL SELECTOR DE CAMPAÑAS
   const [savedCampaigns, setSavedCampaigns] = useState<any[]>([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
+
+  useEffect(() => {
+  const fetchSession = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      setCurrentEstablishmentId(user.id);
+    }
+  };
+  fetchSession();
+  }, []);
 
   // 🚀 CARGAMOS LAS CAMPAÑAS AL INICIAR
   useEffect(() => {
     fetchCampaigns();
   }, []);
 
+  // 1. Modifica el useEffect que carga los datos para que espere al ID
+  useEffect(() => {
+    if (currentEstablishmentId) {
+      fetchCampaigns(); // Ajusta al nombre de tu función
+    }
+  }, [currentEstablishmentId]);
+
+  // 2. Agrega el filtro .eq() en la consulta a Supabase
   const fetchCampaigns = async () => {
+    if (!currentEstablishmentId) return;
+
     const { data, error } = await supabase
       .from('promo_scripts')
-      .select('id, name, config_payload')
+      .select('*') 
+      .eq('establishment_id', currentEstablishmentId) // 🔒 Candado de seguridad multi-tenant
       .order('created_at', { ascending: false });
-    
+
     if (!error && data) {
-      setSavedCampaigns(data);
+      setSavedCampaigns(data); // Ajusta al nombre de tu estado local
     }
   };
 
