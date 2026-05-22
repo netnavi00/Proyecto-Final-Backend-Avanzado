@@ -326,6 +326,19 @@ export function CreativeLab() {
     }
   };
 
+  const handleDeleteCatalogItem = (e: React.MouseEvent, idToDelete: string) => {
+    e.stopPropagation(); // 🛡️ CRUCIAL: Evita que el clic seleccione la imagen en el lienzo
+    const confirmDelete = window.confirm("¿Seguro que deseas eliminar este elemento de la biblioteca?");
+    if (confirmDelete) {
+      setCatalog(prev => prev.filter(item => item.id !== idToDelete));
+      
+      // Opcional: Si el elemento borrado estaba seleccionado en el slot actual, lo quitamos
+      if (activeSlot?.boundItemId === idToDelete) {
+        updateSlot({ boundItemId: null });
+      }
+    }
+  };
+
   const exportRecipe = async (currentEstablishmentId: string) => {
     const MAX_RECIPES = 5; 
 
@@ -615,34 +628,45 @@ return (
                 <div className="flex flex-col gap-[14px]">
                     {/* 🚀 INICIO DEL BLOQUE REEMPLAZADO 🚀 */}
                     {catalog.filter(i => i.type === catalogTab).map(item => {
-                      const isSelected = activeSlot?.boundItemId === item.id;
-                      
-                      return (
-                        <div 
-                          key={item.id} 
-                          onClick={() => updateSlot({ boundItemId: item.id })} 
-                          className={`flex items-center gap-[14px] p-[9px] border cursor-pointer transition-colors ${
-                            isSelected 
-                              ? (item.type === 'menu' ? 'border-aura-cyan bg-aura-cyan/10' : 'border-purple-500 bg-purple-500/10') 
-                              : 'border-aura-dark hover:border-aura-green/50 bg-aura-bg hover:bg-aura-panel'
-                          }`}
-                        >
-                          <div className="w-12 h-12 bg-cover bg-center border-2 border-aura-dark shrink-0" style={{ backgroundImage: `url(${item.imageUrl})` }} />
-                          <div className="flex flex-col flex-1 overflow-hidden">
-                            <span className={`text-[13px] font-bold truncate transition-colors ${
+                        const isSelected = activeSlot?.boundItemId === item.id;
+                        
+                        return (
+                          <div 
+                            key={item.id} 
+                            onClick={() => updateSlot({ boundItemId: item.id })} 
+                            // 👇 Añadimos 'group' al inicio del className
+                            className={`group flex items-center gap-[14px] p-[9px] border cursor-pointer transition-colors ${
                               isSelected 
-                                ? (item.type === 'menu' ? 'text-aura-cyan' : 'text-purple-400') 
-                                : 'text-aura-text'
-                            }`}>
-                              {item.name}
-                            </span>
-                            {item.type === 'menu' && typeof item.price === 'number' && (
-                              <span className="text-[12px] text-aura-green font-mono">${item.price.toFixed(2)}</span>
-                            )}
+                                ? (item.type === 'menu' ? 'border-aura-cyan bg-aura-cyan/10' : 'border-purple-500 bg-purple-500/10') 
+                                : 'border-aura-dark hover:border-aura-green/50 bg-aura-bg hover:bg-aura-panel'
+                            }`}
+                          >
+                            <div className="w-12 h-12 bg-cover bg-center border-2 border-aura-dark shrink-0" style={{ backgroundImage: `url(${item.imageUrl})` }} />
+                            <div className="flex flex-col flex-1 overflow-hidden">
+                              <span className={`text-[13px] font-bold truncate transition-colors ${
+                                isSelected 
+                                  ? (item.type === 'menu' ? 'text-aura-cyan' : 'text-purple-400') 
+                                  : 'text-aura-text'
+                              }`}>
+                                {item.name}
+                              </span>
+                              {item.type === 'menu' && typeof item.price === 'number' && (
+                                <span className="text-[12px] text-aura-green font-mono">${item.price.toFixed(2)}</span>
+                              )}
+                            </div>
+
+                            {/* 👇 NUEVO BOTÓN DE ELIMINAR (Oculto por defecto, visible al hacer hover) */}
+                            <button 
+                              onClick={(e) => handleDeleteCatalogItem(e, item.id)}
+                              className="hidden group-hover:flex items-center justify-center w-8 h-8 shrink-0 text-aura-red hover:bg-aura-red/20 border border-transparent hover:border-aura-red/50 transition-all font-black text-[12px]"
+                              title="Eliminar elemento"
+                            >
+                              X
+                            </button>
+
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                     {/* 🚀 FIN DEL BLOQUE REEMPLAZADO 🚀 */}
                 </div>
               </div>
