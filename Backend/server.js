@@ -56,7 +56,7 @@ app.post('/api/telemetry/ping', telemetryLimiter, authHardwareKey, validateTelem
   try {
     // Inyectar el registro directo a la tabla de Supabase de manera segura
     const { data, error } = await supabase
-      .from('profiles') // Asegúrate de que tu tabla en Supabase se llame así o cámbialo a tu gusto
+      .from('profiles') 
       .insert([
         { 
           device_id: device_id, 

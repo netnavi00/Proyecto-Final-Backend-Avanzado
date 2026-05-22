@@ -21,7 +21,7 @@ async function testMiddlewares() {
       'Content-Type': 'application/json',
       'x-aura-node-key': 'AURA_RPI_SECRET_2026' // Llave correcta
     },
-    body: JSON.stringify({ device_id: 'RPI-001' }) // Omitimos status y establishment_id
+    body: JSON.stringify({ device_id: 'RPI-001' }) // Omite status y establishment_id
   });
   console.log("Resultado 2:", await res2.json(), "\n");
 
